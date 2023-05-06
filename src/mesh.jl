@@ -67,7 +67,7 @@ function nprange(start, _end, n)
 end
 
 # create a mesh that is identical to numpy's mgrid[] spacing
-function new_mesh(n)
+function new_mesh(n::Int)
     xvals = nprange(0, 2pi, n)
     yvals = copy(xvals)
     zvals = copy(xvals)
