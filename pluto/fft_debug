@@ -40,10 +40,45 @@ names(sgpu)
 const par = sgpu.markers.SingleThread()
 
 # ╔═╡ 3b36b955-c489-4673-b8c3-56998354fae1
-const N = 128
+const N = 8
 
 # ╔═╡ ba5d6ac1-727f-4be7-acd5-8c098d93d7ba
 const K = sgpu.mesh.wavenumbers(N)
+
+# ╔═╡ 177df9a1-654f-4fcc-b4e2-c23e0c25a071
+const K2 = K[1].^2 + K[2].^2 + K[3].^2;
+
+# ╔═╡ 73edb142-7502-4556-830c-e4d253514929
+K.ky
+
+# ╔═╡ 09e454e4-2bc0-4515-ae4c-0051142394a9
+begin
+	increasing_wavenumbers_positive = 0:(div(N,2)-1)
+    increasing_wavenumbers_negative = -(div(N,2)):-1
+
+    # fft frequencies replicatese numpy fft.fftfreq(N, 1/N)
+    ky_linear = vcat([increasing_wavenumbers_positive, increasing_wavenumbers_negative]...)
+	kz_linear = copy(ky_linear)
+	kx_linear = ky_linear[1:5]
+end
+
+# ╔═╡ ed52b05d-c1ec-4e5c-aaaa-5931d52399a5
+kx, ky, kz = ndgrid(kx_linear, ky_linear, kz_linear)
+
+# ╔═╡ c42cb77a-d195-47fe-872b-9a2fba864800
+ky ./ Array(kz)
+
+# ╔═╡ d907dfdb-1d0a-4b47-8722-30fd51fb3fed
+kmax_dealias =  2. / 3. *K.kn
+
+# ╔═╡ 8ff60bd9-ab26-45ba-a097-045652b64697
+# dealias = np.array((abs(K[0]) < kmax_dealias)*(abs(K[1]) < kmax_dealias)* (abs(K[2]) < kmax_dealias), dtype=bool)
+
+# ╔═╡ 13fd1af0-b585-4d08-b13e-9c952bf04432
+dealias = ((abs.(kx) .< kmax_dealias) .* (abs.(ky) .< kmax_dealias) .* (abs.(kz) .< kmax_dealias))
+
+# ╔═╡ 77626510-bff9-406d-a71b-289fcf3edcab
+BitArray
 
 # ╔═╡ 046c6800-08f9-4e69-9570-0c802ce62423
 const mesh = sgpu.mesh.new_mesh(N)
@@ -92,7 +127,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "71a25de324d66428b531c134cc3204997729a01c"
+project_hash = "182cf8de945373c65ed154e4107d9883bb4932e7"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1366,6 +1401,15 @@ version = "3.5.0+0"
 # ╠═b7efeb89-8de4-4f61-a2d2-d46364864e9e
 # ╠═3b36b955-c489-4673-b8c3-56998354fae1
 # ╠═ba5d6ac1-727f-4be7-acd5-8c098d93d7ba
+# ╠═177df9a1-654f-4fcc-b4e2-c23e0c25a071
+# ╠═73edb142-7502-4556-830c-e4d253514929
+# ╠═09e454e4-2bc0-4515-ae4c-0051142394a9
+# ╠═ed52b05d-c1ec-4e5c-aaaa-5931d52399a5
+# ╠═c42cb77a-d195-47fe-872b-9a2fba864800
+# ╠═d907dfdb-1d0a-4b47-8722-30fd51fb3fed
+# ╠═8ff60bd9-ab26-45ba-a097-045652b64697
+# ╠═13fd1af0-b585-4d08-b13e-9c952bf04432
+# ╠═77626510-bff9-406d-a71b-289fcf3edcab
 # ╠═046c6800-08f9-4e69-9570-0c802ce62423
 # ╠═5421714b-baf3-4136-9236-cb17ff7be80a
 # ╠═85011187-8daa-4064-b93c-4624fa3dfcca
