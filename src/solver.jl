@@ -9,7 +9,7 @@ using ..state: State
 using ..config: Config
 
 # calculate the curl of a fourier space array `input` and store the result in the x-space array `out`
-function curl!(
+@views function curl!(
     parallel::P, 
     K::Wavenumbers, 
     input::Array{ComplexF64, 4}
@@ -17,6 +17,7 @@ function curl!(
     out::Array{Float64, 4}
 ) where P <: AbstractParallel
     j = complex(0, 1)
+
     ifftn_mpi!(parallel, K, j*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1]), out[:, :, :, 3])
     ifftn_mpi!(parallel, K, j*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3]), out[:, :, :, 2])
     ifftn_mpi!(parallel, K, j*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2]), out[:, :, :, 1])
@@ -26,7 +27,7 @@ end
 
 # take the cross product of X-Space a,b vectors 
 # stores the result in (fourier space) `out` and then return the
-function cross!(
+@views function cross!(
     parallel::P, 
     a::Array{Float64, 4}, 
     b::Array{Float64, 4}
@@ -56,9 +57,9 @@ function compute_rhs!(
     state::State
 ) where P <: AbstractParallel
 
-    if rk_step > 0
-        for i in 1:3
-            ifftn_mpi!(U_hat[:, :, :, i], U[:, :, :, i])
+    if rk_step != 1
+        @views for i in 1:3
+            ifftn_mpi!(parallel, K, U_hat[:, :, :, i], U[:, :, :, i])
         end
     end
 
