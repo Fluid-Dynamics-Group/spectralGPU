@@ -40,6 +40,12 @@ function cross!(
     nothing
 end
 
+function wavenumber_product!(arr::Array{ComplexF64, 3}, K::Wavenumbers; out::Array{ComplexF64, 4})
+    out[:, :, :, 1] .= arr .* K.kx
+    out[:, :, :, 2] .= arr .* K.ky
+    out[:, :, :, 3] .= arr .* K.kz
+end
+
 function compute_rhs!(
     rk_step::Int,
     parallel::P,
@@ -56,22 +62,24 @@ function compute_rhs!(
         end
     end
 
-    curl!(parallel, K, U_hat, out = state.curl)
-    #cross!(U, state.curl; out = state.dU)
-    #state.dU .*= dealias
+    curl!(parallel, K, U_hat; out = state.curl)
+    cross!(parallel, U, state.curl; out = state.dU)
+    state.dU .*= state.dealias
 
-    #state.P_hat[:, :, :] .= 0. + 0j;
-    #sum(P_hat, state.dU .* state.K_over_K², dims=0)
+    state.P_hat[:, :, :] .= complex(0., 0);
+    # compute P_hat = sum(dU * K_over_K²):
+    sum!(state.P_hat, state.dU .* state.K_over_K²)
 
-    ## TODO: make any adjustments to the forcing vector
-    #
-    ## add Pressure term to dU/dt
-    #state.dU -= state.P_hat * K
+    # TODO: make any adjustments to the forcing vector
+    
+    # add Pressure term to dU/dt
+    wavenumber_product!(state.P_hat, K; out = state.wavenumber_product_tmp)
+    state.dU .-= state.wavenumber_product_tmp
 
-    ## dU is now the Eulerian term / Nonlinear term in the NSE
-    ## now calculate the diffusion term
+    # dU is now the Eulerian term / Nonlinear term in the NSE
+    # now calculate the diffusion term
 
-    #state.dU -= config.ν * state.K² * U_hat
+    state.dU .-= config.ν .* state.K² .* U_hat
 end
 
 #
