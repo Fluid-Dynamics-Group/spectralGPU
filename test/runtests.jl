@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver
+using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate
 using Test
 
 @testset "mesh.jl" begin
@@ -25,7 +25,14 @@ end
     @test begin
         ic = markers.TaylorGreen()
         initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
-        true
+        u_hat_sum = sum(abs.(U_hat))
+
+        if u_hat_sum == 0
+            println("uhat sum was zero: ", u_hat_sum)
+            false
+        else
+            true
+        end
     end
 end
 
@@ -37,7 +44,7 @@ end
     K = mesh.wavenumbers(N)
     st = state.create_state(N, K)
     msh = mesh.new_mesh(N)
-    cfg = config.create_config(N, re)
+    cfg = config.create_config(N, re, 1.0)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
@@ -58,7 +65,7 @@ end
     # main solver call
     @test begin
         solver.compute_rhs!(
-            0,
+            2,
             parallel,
             K,
             cfg,
@@ -69,4 +76,71 @@ end
         true
     end
 
+end
+
+@testset "integrate.jl" begin
+    parallel = markers.SingleThread()
+    N = 64
+    re = 40.
+    time = 0.05
+
+    K = mesh.wavenumbers(N)
+    st = state.create_state(N, K)
+    msh = mesh.new_mesh(N)
+    cfg = config.create_config(N, re, time)
+
+    U = zeros(N, N, N, 3)
+    U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
+
+    # main solver call
+    @test begin
+        Integrate.integrate(
+            parallel,
+            K,
+            cfg,
+            st,
+            U,
+            U_hat,
+        )
+        true
+    end
+end
+
+@testset "integrate.jl - checked" begin
+    parallel = markers.SingleThread()
+    N = 64
+
+    K = mesh.wavenumbers(N)
+    st = state.create_state(N, K)
+    msh = mesh.new_mesh(N)
+    cfg = config.taylor_green_validation()
+    ic = markers.TaylorGreen()
+
+    U = zeros(N, N, N, 3)
+    U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+
+    u_sum = sum(abs.(U))
+    println("sum of all values in U is ", u_sum);
+    u_hat_sum = sum(abs.(U_hat))
+    println("sum of all values in U_hat is ", u_hat_sum);
+
+    # main solver call
+    @test begin
+        Integrate.integrate(
+            parallel,
+            K,
+            cfg,
+            st,
+            U,
+            U_hat,
+        )
+
+        u_sum = sum(abs.(U))
+        println("sum of all values in U is ", u_sum);
+
+        k = (1/2) * sum(U .* U) * (1 / N)^3
+        println("k is ", k)
+        round(k - 0.124953117517; digits=7) == 0
+    end
 end

@@ -8,6 +8,7 @@ include("./state.jl")
 include("./config.jl")
 
 include("./solver.jl")
+include("./integrate.jl")
 
 export fft
 export mesh
