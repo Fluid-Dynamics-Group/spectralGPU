@@ -11,12 +11,14 @@ struct State
     P_hat::Array{ComplexF64, 3}
     K²::Array{Int, 3}
     K_over_K²::Array{Float64, 4}
+    wavenumber_product_tmp::Array{ComplexF64, 4}
 end
 
 function create_state(N::Int, K::Wavenumbers)::State
     dU = ComplexF64.(zeros(K.kn, N, N, 3))
     curl = zeros(N, N, N, 3)
     P_hat = ComplexF64.(zeros(K.kn, N, N))
+    wavenumber_product_tmp = ComplexF64.(zeros(K.kn, N, N, 3))
 
     K² = K[1].^2 + K[2].^2 + K[3].^3
 
@@ -36,7 +38,8 @@ function create_state(N::Int, K::Wavenumbers)::State
         dealias,
         P_hat,
         K²,
-        K_over_K²
+        K_over_K²,
+        wavenumber_product_tmp
     )
 end
 

@@ -55,13 +55,18 @@ end
         true
     end
 
-    #solver.compute_rhs!(
-    #    0,
-    #    parallel,
-    #    K,
-    #    cfg,
-    #    U,
-    #    U_hat,
-    #    st
-    #)
+    # main solver call
+    @test begin
+        solver.compute_rhs!(
+            0,
+            parallel,
+            K,
+            cfg,
+            U,
+            U_hat,
+            st
+        )
+        true
+    end
+
 end
