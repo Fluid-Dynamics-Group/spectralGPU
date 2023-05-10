@@ -6,7 +6,7 @@ using FFTW
 using CUDA.CUFFT
 using CUDA
 using ..markers: AbstractParallel, ParallelMpi, SingleThreadCPU, SingleThreadGPU
-using ..mesh: Wavenumbers
+using ..mesh: Wavenumbers, WavenumbersGPU
 
 fftn_mpi!(parallel::P, u, uhat) where P <: AbstractParallel = error("function is not not yet implemented for $(typeof(uhat)), $(typeof(u)). This is a bug")
 
@@ -33,7 +33,7 @@ function ifftn_mpi!(parallel::SingleThreadCPU, wavenumbers::Wavenumbers, uhat::F
 end
 
 # single threaded inverse FFT implementation for CUDA arrays
-function ifftn_mpi!(parallel::SingleThreadGPU, wavenumbers::Wavenumbers, uhat::CuArray{ComplexF64, 3}, u::CuArray{Float64, 3}
+function ifftn_mpi!(parallel::SingleThreadGPU, wavenumbers::WavenumbersGPU, uhat::CuArray{ComplexF64, 3}, u::CuArray{Float64, 3}
 )
     u[:, :, :] .= CUFFT.irfft(uhat, wavenumbers.n, 1:3)
 end

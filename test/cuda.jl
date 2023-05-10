@@ -3,12 +3,21 @@ using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver
 using Test
 using CUDA
 
+@testset "state.jl" begin
+    N = 64
+    K = mesh.wavenumbers_gpu(N)
+    @test begin
+        st::state.StateGPU = state.create_state_gpu(N, K)
+        true
+    end
+end
+
 
 @testset "cuda fft" begin
     parallel = markers.SingleThreadGPU()
     N = 64
 
-    K = mesh.wavenumbers(N)
+    K = mesh.wavenumbers_gpu(N)
 
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
@@ -29,7 +38,7 @@ end
     parallel = markers.SingleThreadGPU()
     N = 64
 
-    K = mesh.wavenumbers(N)
+    K = mesh.wavenumbers_gpu(N)
 
     U = CuArray(zeros(N, N, N, 3))
     U_inverse = CuArray(zeros(N, N, N, 3))
@@ -70,43 +79,43 @@ end
     end
 end
 
-#@testset "solver.jl" begin
-#    parallel = markers.SingleThreadGPU()
-#    N = 64
-#    re = 40.
-#
-#    K = mesh.wavenumbers(N)
-#    st = state.create_state(N, K)
-#    msh = mesh.new_mesh(N)
-#    cfg = config.create_config(N, re, 1.0)
-#
-#    U = CuArray(zeros(N, N, N, 3))
-#    U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
-#
-#    # curl
-#    @test begin
-#        solver.curl!(parallel, K, U_hat; out=st.curl)
-#        true
-#    end
-#
-#    # cross
-#    @test begin
-#        solver.cross!(parallel, U, st.curl; out = st.dU)
-#        true
-#    end
-#
-#    # main solver call
-#    @test begin
-#        solver.compute_rhs!(
-#            2,
-#            parallel,
-#            K,
-#            cfg,
-#            U,
-#            U_hat,
-#            st
-#        )
-#        true
-#    end
-#
-#end
+@testset "solver.jl" begin
+    parallel = markers.SingleThreadGPU()
+    N = 64
+    re = 40.
+
+    K = mesh.wavenumbers_gpu(N)
+    st = state.create_state_gpu(N, K)
+    msh = mesh.new_mesh(N)
+    cfg = config.create_config(N, re, 1.0)
+
+    U = CuArray(zeros(N, N, N, 3))
+    U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+
+    # curl
+    @test begin
+        solver.curl!(parallel, K, U_hat; out=st.curl)
+        true
+    end
+
+    # cross
+    @test begin
+        solver.cross!(parallel, U, st.curl; out = st.dU)
+        true
+    end
+
+    # main solver call
+    @test begin
+        solver.compute_rhs!(
+            2,
+            parallel,
+            K,
+            cfg,
+            U,
+            U_hat,
+            st
+        )
+        true
+    end
+
+end
