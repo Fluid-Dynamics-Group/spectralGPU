@@ -29,5 +29,10 @@ export AbstractWavenumbers
 
 abstract type AbstractWavenumbers end
 
+# Config
+export AbstractConfig
+
+abstract type AbstractConfig end
+
 #
 end

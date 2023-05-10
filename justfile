@@ -7,3 +7,6 @@ build:
 test:
 	#julia ./test/cpu_singlethread.jl
 	julia ./test/cuda.jl
+
+bench:
+	julia ./benches/cpu_gpu.jl
