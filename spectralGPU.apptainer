@@ -5,6 +5,10 @@ From: base.sif
 	./ /spectralGPU
 
 %post
+	# ensure julia is in the $PATH variable
+	. /root/.profile
+
+	julia --version
 	julia -e 'import Pkg; Pkg.add("FFTW"); Pkg.add("LazyGrids")'
 
 %apprun distribute
