@@ -2,7 +2,7 @@ module solver
 
 export curl!, cross!, compute_rhs!
 
-using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers
+using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig
 using ..fft: ifftn_mpi!, fftn_mpi!
 using ..mesh: Wavenumbers, WavenumbersGPU
 using ..state: State, StateGPU
@@ -90,11 +90,11 @@ function compute_rhs!(
     rk_step::Int,
     parallel::P,
     K::WavenumbersGPU,
-    config::Config,
+    config::CFG,
     U::CuArray{Float64, 4},
     U_hat::CuArray{ComplexF64, 4},
     state::StateGPU
-) where P <: AbstractParallel
+) where P <: AbstractParallel where CFG <: AbstractConfig
     __compute_rhs!(rk_step, parallel, K, config, U, U_hat, state)
 end
 
@@ -102,11 +102,11 @@ function compute_rhs!(
     rk_step::Int,
     parallel::P,
     K::Wavenumbers,
-    config::Config,
+    config::CFG,
     U::Array{Float64, 4},
     U_hat::Array{ComplexF64, 4},
     state::State
-) where P <: AbstractParallel
+) where P <: AbstractParallel where CFG <: AbstractConfig
     __compute_rhs!(rk_step, parallel, K, config, U, U_hat, state)
 end
 
@@ -114,11 +114,11 @@ function __compute_rhs!(
     rk_step::Int,
     parallel::P,
     K::WAVE,
-    config::Config,
+    config::CFG,
     U::ARRAY,
     U_hat::FARRAY,
     state::STATE
-) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where ARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where ARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
 
     if rk_step != 1
         @views for i in 1:3
