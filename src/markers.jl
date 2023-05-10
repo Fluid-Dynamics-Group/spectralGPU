@@ -19,5 +19,15 @@ abstract type AbstractInitialCondition end
 struct TaylorGreen <: AbstractInitialCondition end
 struct LoadInitialCondition <: AbstractInitialCondition end
 
+# State
+export AbstractState
+
+abstract type AbstractState end
+
+# Wavenumbers
+export AbstractWavenumbers
+
+abstract type AbstractWavenumbers end
+
 #
 end

@@ -1,11 +1,14 @@
 module mesh
 
-export Wavenumbers, wavenumbers
+using ..markers: AbstractWavenumbers
+
+export Wavenumbers, wavenumbers, WavenumbersGPU, wavenumbers_gpu
 export Mesh, new_mesh 
 
+using CUDA
 using LazyGrids
 
-struct Wavenumbers
+struct Wavenumbers <: AbstractWavenumbers
     # number of x space values in each direction
     n::Int
     # number of modes in the x direction (N //2) +1
@@ -14,6 +17,17 @@ struct Wavenumbers
     kx::LazyGrids.GridAV{Int64, 1, 3}
     ky::LazyGrids.GridAV{Int64, 2, 3}
     kz::LazyGrids.GridAV{Int64, 3, 3}
+end
+
+struct WavenumbersGPU <: AbstractWavenumbers
+    # number of x space values in each direction
+    n::Int
+    # number of modes in the x direction (N //2) +1
+    # so for N = 64, this is 33
+    kn::Int
+    kx::CuArray{Int64, 3}
+    ky::CuArray{Int64, 3}
+    kz::CuArray{Int64, 3}
 end
 
 function wavenumbers(n::Int)::Wavenumbers
@@ -36,8 +50,33 @@ function wavenumbers(n::Int)::Wavenumbers
     Wavenumbers(n, kn, kx, ky, kz)
 end
 
+function wavenumbers_gpu(n::Int)::WavenumbersGPU
+    K = wavenumbers(n)
+
+    return WavenumbersGPU(
+        K.n,
+        K.kn,
+        CuArray(K.kx),
+        CuArray(K.ky),
+        CuArray(K.kz),
+    )
+end
+
 # make the Wavenumber type indexable
 function Base.getindex(k_all::Wavenumbers, dim::Int)::LazyGrids.GridAV
+    if dim == 1
+        return k_all.kx
+    elseif dim == 2
+        return k_all.ky
+    elseif dim == 3
+        return k_all.kz
+    else
+        error("dimension was not 1,2,3")
+    end
+end
+
+# make the Wavenumber type indexable
+function Base.getindex(k_all::WavenumbersGPU, dim::Int)::CuArray{Int64, 3}
     if dim == 1
         return k_all.kx
     elseif dim == 2
