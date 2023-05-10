@@ -33,6 +33,8 @@ abstract type AbstractWavenumbers end
 export AbstractConfig
 
 abstract type AbstractConfig end
+struct ProductionConfig <: AbstractConfig end
+struct ValidationConfig <: AbstractConfig end
 
 #
 end

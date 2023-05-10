@@ -1,7 +1,8 @@
 module state
 
 using ..mesh: Wavenumbers
-using ..markers: AbstractState, AbstractWavenumbers
+using ..markers: AbstractState, AbstractWavenumbers, AbstractConfig
+using ..config: Config
 
 using CUDA
 
@@ -17,6 +18,9 @@ struct State <: AbstractState
     K²::Array{Int, 3}
     K_over_K²::Array{Float64, 4}
     wavenumber_product_tmp::Array{ComplexF64, 4}
+    ν::Float64
+    a::Vector{Float64}
+    b::Vector{Float64}
 end
 
 struct StateGPU <: AbstractState
@@ -29,9 +33,14 @@ struct StateGPU <: AbstractState
     K²::CuArray{Int, 3}
     K_over_K²::CuArray{Float64, 4}
     wavenumber_product_tmp::CuArray{ComplexF64, 4}
+    ν::CuVector{Float64}
+    # RK integration constants
+    a::Vector{Float64}
+    # RK integration constants
+    b::Vector{Float64}
 end
 
-function create_state(N::Int, K::WAVE)::State where WAVE <: AbstractWavenumbers
+function create_state(N::Int, K::WAVE, config::Config{CFG})::State where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
     dU = ComplexF64.(zeros(K.kn, N, N, 3))
     U_hat₁ = ComplexF64.(zeros(K.kn, N, N, 3))
     U_hat₀ = ComplexF64.(zeros(K.kn, N, N, 3))
@@ -58,6 +67,12 @@ function create_state(N::Int, K::WAVE)::State where WAVE <: AbstractWavenumbers
 
     K_over_K² ./= K²_nonzero
 
+    # https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Examples
+    # a_j is equal to the canonical b_i
+    # b_i is equal to the canonical a_j
+    a = [1/6, 1/3, 1/3, 1/6]
+    b = [0.5, 0.5, 1.]
+
     State(
         dU,
         U_hat₁,
@@ -67,12 +82,15 @@ function create_state(N::Int, K::WAVE)::State where WAVE <: AbstractWavenumbers
         P_hat,
         K²,
         K_over_K²,
-        wavenumber_product_tmp
+        wavenumber_product_tmp,
+        config.ν,
+        a,
+        b
     )
 end
 
-function create_state_gpu(N::Int, K::WAVE)::StateGPU where WAVE <: AbstractWavenumbers
-    cpu_state = create_state(N, K)
+function create_state_gpu(N::Int, K::WAVE, config::Config{CFG})::StateGPU where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
+    cpu_state = create_state(N, K, config)
     dealias::Array{Int8, 3} = Array(cpu_state.dealias)
 
     return StateGPU(
@@ -86,6 +104,11 @@ function create_state_gpu(N::Int, K::WAVE)::StateGPU where WAVE <: AbstractWaven
         CuArray(cpu_state.K²),
         CuArray(cpu_state.K_over_K²),
         CuArray(cpu_state.wavenumber_product_tmp),
+        CuVector([cpu_state.ν]),
+        #CuVector(cpu_state.a),
+        #CuVector(cpu_state.b),
+        cpu_state.a,
+        cpu_state.b,
     )
 end
 

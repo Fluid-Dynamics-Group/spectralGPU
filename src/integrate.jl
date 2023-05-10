@@ -12,7 +12,7 @@ using CUDA
 function integrate(
     parallel::P, 
     K::Wavenumbers, 
-    config::CFG, 
+    config::Config{CFG}, 
     state::State,
     U::Array{Float64, 4}, 
     U_hat::Array{ComplexF64, 4}
@@ -23,7 +23,7 @@ end
 function integrate(
     parallel::P, 
     K::WavenumbersGPU,
-    config::CFG,
+    config::Config{CFG},
     state::StateGPU,
     U::CuArray{Float64, 4}, 
     U_hat::CuArray{ComplexF64, 4}
@@ -32,21 +32,15 @@ function integrate(
 end
 
 function __integrate(
-    parallel::P, 
-    K::WAVE, 
-    config::CFG, 
+    parallel::P,
+    K::WAVE,
+    config::Config{CFG},
     state::STATE,
     U::XARRAY,
     U_hat::FARRAY,
 ) where P<: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers where CFG  <: AbstractConfig
     t = 0
     tstep = 0
-
-    # https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Examples
-    # a_j is equal to the canonical b_i
-    # b_i is equal to the canonical a_j
-    a = [1/6, 1/3, 1/3, 1/6]
-    b = [0.5, 0.5, 1.]
 
     dt = calculate_dt(U, config)
 
@@ -60,15 +54,15 @@ function __integrate(
         state.U_hat₀[:, :, :, :] .= U_hat[:, :, :, :]
 
         for rk_step in 1:4
-            compute_rhs!(rk_step, parallel, K, config, U, U_hat, state)
+            compute_rhs!(rk_step, parallel, K, U, U_hat, state)
 
             #println("du abs change: ", sum(abs.(state.dU)))
 
             if rk_step < 4
-                U_hat[:, :, :, :] .= state.U_hat₀ .+ b[rk_step] * dt * state.dU
+                U_hat[:, :, :, :] .= state.U_hat₀ .+ state.b[rk_step] * dt * state.dU
             end
 
-            state.U_hat₁ .+= a[rk_step] * dt .* state.dU
+            state.U_hat₁ .+= state.a[rk_step] * dt .* state.dU
         end
 
         U_hat[:, :, :, :] .= state.U_hat₁

@@ -11,13 +11,13 @@ using ..config: Config
 using CUDA
 
 # calculate the curl of a fourier space array `input` and store the result in the x-space array `out`
-@views function curl!(
+@views function __curl!(
     parallel::P, 
-    K::Wavenumbers, 
-    input::Array{ComplexF64, 4}
+    K::WAVE, 
+    input::FARRAY
     ;
-    out::Array{Float64, 4}
-) where P <: AbstractParallel
+    out::XARRAY
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where WAVE <: AbstractWavenumbers
     j = complex(0, 1)
 
     ifftn_mpi!(parallel, K, j*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1]), out[:, :, :, 3])
@@ -29,18 +29,22 @@ end
 
 @views function curl!(
     parallel::P, 
+    K::Wavenumbers, 
+    input::Array{ComplexF64, 4}
+    ;
+    out::Array{Float64, 4}
+) where P <: AbstractParallel
+    __curl!(parallel, K, input, out = out);
+end
+
+@views function curl!(
+    parallel::P, 
     K::WavenumbersGPU,
     input::CuArray{ComplexF64, 4}
     ;
     out::CuArray{Float64, 4}
 ) where P <: AbstractParallel
-    j = complex(0, 1)
-
-    @CUDA.sync ifftn_mpi!(parallel, K,j * (CuArray(K[1]).*input[:, :, :, 2] .- CuArray(K[2]).*input[:, :, :, 1]), out[:, :, :, 3])
-    @CUDA.sync ifftn_mpi!(parallel, K, j*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3]), out[:, :, :, 2])
-    @CUDA.sync ifftn_mpi!(parallel, K, j*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2]), out[:, :, :, 1])
-
-    nothing
+    __curl!(parallel, K, input, out = out);
 end
 
 
@@ -67,9 +71,9 @@ end
     ;
     out::CuArray{ComplexF64, 4}
 ) where P <: AbstractParallel
-    @CUDA.sync fftn_mpi!(parallel, a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2], out[:, :, :, 1])
-    @CUDA.sync fftn_mpi!(parallel, a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3], out[:, :, :, 2])
-    @CUDA.sync fftn_mpi!(parallel, a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1], out[:, :, :, 3])
+    fftn_mpi!(parallel, a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2], out[:, :, :, 1])
+    fftn_mpi!(parallel, a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3], out[:, :, :, 2])
+    fftn_mpi!(parallel, a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1], out[:, :, :, 3])
 
     nothing
 end
@@ -90,35 +94,32 @@ function compute_rhs!(
     rk_step::Int,
     parallel::P,
     K::WavenumbersGPU,
-    config::CFG,
     U::CuArray{Float64, 4},
     U_hat::CuArray{ComplexF64, 4},
     state::StateGPU
-) where P <: AbstractParallel where CFG <: AbstractConfig
-    __compute_rhs!(rk_step, parallel, K, config, U, U_hat, state)
+) where P <: AbstractParallel
+    __compute_rhs!(rk_step, parallel, K, U, U_hat, state)
 end
 
 function compute_rhs!(
     rk_step::Int,
     parallel::P,
     K::Wavenumbers,
-    config::CFG,
     U::Array{Float64, 4},
     U_hat::Array{ComplexF64, 4},
     state::State
-) where P <: AbstractParallel where CFG <: AbstractConfig
-    __compute_rhs!(rk_step, parallel, K, config, U, U_hat, state)
+) where P <: AbstractParallel
+    __compute_rhs!(rk_step, parallel, K, U, U_hat, state)
 end
 
 function __compute_rhs!(
     rk_step::Int,
     parallel::P,
     K::WAVE,
-    config::CFG,
     U::ARRAY,
     U_hat::FARRAY,
     state::STATE
-) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where ARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where ARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers
 
     if rk_step != 1
         @views for i in 1:3
@@ -143,7 +144,7 @@ function __compute_rhs!(
     # dU is now the Eulerian term / Nonlinear term in the NSE
     # now calculate the diffusion term
 
-    state.dU .-= config.ν .* state.K² .* U_hat
+    state.dU .-= state.ν .* state.K² .* U_hat
 end
 
 #
