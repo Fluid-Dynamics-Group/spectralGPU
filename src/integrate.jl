@@ -1,11 +1,13 @@
 module Integrate
 
-using ..markers: AbstractParallel
+using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers
 using ..fft: ifftn_mpi!, fftn_mpi!
-using ..mesh: Wavenumbers
-using ..state: State
+using ..mesh: Wavenumbers, WavenumbersGPU
+using ..state: State, StateGPU
 using ..config: Config
 using ..solver: compute_rhs! 
+
+using CUDA
 
 function integrate(
     parallel::P, 
@@ -15,6 +17,28 @@ function integrate(
     U::Array{Float64, 4}, 
     U_hat::Array{ComplexF64, 4}
 ) where P<: AbstractParallel
+    __integrate(parallel, K, config, state, U, U_hat)
+end
+
+function integrate(
+    parallel::P, 
+    K::WavenumbersGPU,
+    config::Config,
+    state::StateGPU,
+    U::CuArray{Float64, 4}, 
+    U_hat::CuArray{ComplexF64, 4}
+) where P<: AbstractParallel
+    __integrate(parallel, K, config, state, U, U_hat)
+end
+
+function __integrate(
+    parallel::P, 
+    K::WAVE, 
+    config::Config, 
+    state::STATE,
+    U::XARRAY,
+    U_hat::FARRAY,
+) where P<: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers
     t = 0
     tstep = 0
 
