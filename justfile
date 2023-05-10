@@ -1,5 +1,5 @@
 base:
-	apptainer build base.sif ./base.apptainer 
+	sudo -E apptainer build base.sif ./base.apptainer 
 
 build:
-	apptainer build spectralGPU.sif ./spectralGPU.apptainer 
+	sudo -E apptainer build spectralGPU.sif ./spectralGPU.apptainer 
