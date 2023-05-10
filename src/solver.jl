@@ -8,19 +8,21 @@ using ..mesh: Wavenumbers
 using ..state: State
 using ..config: Config
 
+using CUDA
+
 # calculate the curl of a fourier space array `input` and store the result in the x-space array `out`
 @views function curl!(
     parallel::P, 
     K::Wavenumbers, 
-    input::Array{ComplexF64, 4}
+    input::FARRAY
     ;
-    out::Array{Float64, 4}
-) where P <: AbstractParallel
+    out::XARRAY
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4}
     j = complex(0, 1)
 
-    ifftn_mpi!(parallel, K, j*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1]), out[:, :, :, 3])
-    ifftn_mpi!(parallel, K, j*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3]), out[:, :, :, 2])
-    ifftn_mpi!(parallel, K, j*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2]), out[:, :, :, 1])
+    @CUDA.sync ifftn_mpi!(parallel, K, j*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1]), out[:, :, :, 3])
+    @CUDA.sync ifftn_mpi!(parallel, K, j*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3]), out[:, :, :, 2])
+    @CUDA.sync ifftn_mpi!(parallel, K, j*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2]), out[:, :, :, 1])
 
     nothing
 end
@@ -29,14 +31,14 @@ end
 # stores the result in (fourier space) `out` and then return the
 @views function cross!(
     parallel::P, 
-    a::Array{Float64, 4}, 
-    b::Array{Float64, 4}
+    a::XARRAY,
+    b::XARRAY,
     ;
-    out::Array{ComplexF64, 4}
-) where P <: AbstractParallel
-    fftn_mpi!(parallel, a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2], out[:, :, :, 1])
-    fftn_mpi!(parallel, a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3], out[:, :, :, 2])
-    fftn_mpi!(parallel, a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1], out[:, :, :, 3])
+    out::FARRAY
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4}
+    @CUDA.sync fftn_mpi!(parallel, a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2], out[:, :, :, 1])
+    @CUDA.sync fftn_mpi!(parallel, a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3], out[:, :, :, 2])
+    @CUDA.sync fftn_mpi!(parallel, a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1], out[:, :, :, 3])
 
     nothing
 end

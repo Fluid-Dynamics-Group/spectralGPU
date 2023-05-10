@@ -3,11 +3,12 @@ module markers
 #
 # Parallization (MPI, Single thread)
 #
-export AbstractParallel, ParallelMpi, SingleThread
+export AbstractParallel, ParallelMpi, SingleThreadCPU
 
 abstract type AbstractParallel end
 struct ParallelMpi <: AbstractParallel end
-struct SingleThread <: AbstractParallel end
+struct SingleThreadCPU <: AbstractParallel end
+struct SingleThreadGPU <: AbstractParallel end
 
 #
 # Initial conditions

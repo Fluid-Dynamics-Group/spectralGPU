@@ -12,7 +12,7 @@ using Test
 end
 
 @testset "initial_condition.jl" begin
-    parallel = markers.SingleThread()
+    parallel = markers.SingleThreadCPU()
     N = 64
 
     K = mesh.wavenumbers(N)
@@ -37,7 +37,7 @@ end
 end
 
 @testset "solver.jl" begin
-    parallel = markers.SingleThread()
+    parallel = markers.SingleThreadCPU()
     N = 64
     re = 40.
 
@@ -79,7 +79,7 @@ end
 end
 
 @testset "integrate.jl" begin
-    parallel = markers.SingleThread()
+    parallel = markers.SingleThreadCPU()
     N = 64
     re = 40.
     time = 0.05
@@ -107,7 +107,7 @@ end
 end
 
 @testset "integrate.jl - checked" begin
-    parallel = markers.SingleThread()
+    parallel = markers.SingleThreadCPU()
     N = 64
 
     K = mesh.wavenumbers(N)
