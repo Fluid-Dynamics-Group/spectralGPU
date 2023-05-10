@@ -119,3 +119,42 @@ end
     end
 
 end
+
+@testset "integrate.jl - checked" begin
+    parallel = markers.SingleThreadGPU()
+    N = 64
+
+    K = mesh.wavenumbers_gpu(N)
+    st = state.create_state_gpu(N, K)
+    msh = mesh.new_mesh(N)
+    cfg = config.taylor_green_validation()
+    ic = markers.TaylorGreen()
+
+    U = CuArray(zeros(N, N, N, 3))
+    U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+
+    u_sum = sum(abs.(U))
+    println("sum of all values in U is ", u_sum);
+    u_hat_sum = sum(abs.(U_hat))
+    println("sum of all values in U_hat is ", u_hat_sum);
+
+    # main solver call
+    @test begin
+        Integrate.integrate(
+            parallel,
+            K,
+            cfg,
+            st,
+            U,
+            U_hat,
+        )
+
+        u_sum = sum(abs.(U))
+        println("sum of all values in U is ", u_sum);
+
+        k = (1/2) * sum(U .* U) * (1 / N)^3
+        println("k is ", k)
+        round(k - 0.124953117517; digits=7) == 0
+    end
+end

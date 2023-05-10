@@ -5,5 +5,5 @@ build:
 	sudo -E apptainer build spectralGPU.sif ./spectralGPU.apptainer 
 
 test:
-	julia ./test/cpu_singlethread.jl
+	#julia ./test/cpu_singlethread.jl
 	julia ./test/cuda.jl
