@@ -1,0 +1,11 @@
+Bootstrap: localimage
+From: base.sif
+
+%files
+	./ /spectralGPU
+
+%post
+	julia -e 'import Pkg; Pkg.add("FFTW"); Pkg.add("LazyGrids")'
+
+%apprun distribute
+	echo "hello!"

@@ -3,6 +3,11 @@ uuid = "1f941c8d-9269-406b-be03-2a5a5e88bc1c"
 authors = ["brooks"]
 version = "1.0.0-DEV"
 
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+LazyGrids = "7031d0ef-c40d-4431-b2f8-61a8d2f650db"
+
 [compat]
 julia = "1"
 

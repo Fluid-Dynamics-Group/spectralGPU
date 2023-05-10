@@ -1,0 +1,20 @@
+Bootstrap: docker
+From: ubuntu:20.04
+
+%files
+	./ /spectralGPU
+
+%post
+	rm /bin/sh && ln -s /bin/bash /bin/sh
+
+	apt update -y && apt upgrade -y
+	apt install -y curl libssl-dev
+
+	curl -fsSL https://install.julialang.org | sh -s -- --yes
+
+	. /root/.profile
+
+	julia --version
+
+%apprun distribute
+	echo "hello!"
