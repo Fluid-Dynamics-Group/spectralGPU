@@ -27,7 +27,7 @@ using CUDA
     nothing
 end
 
-@views function curl!(
+function curl!(
     parallel::P, 
     K::Wavenumbers, 
     input::Array{ComplexF64, 4}
@@ -37,7 +37,7 @@ end
     __curl!(parallel, K, input, out = out);
 end
 
-@views function curl!(
+function curl!(
     parallel::P, 
     K::WavenumbersGPU,
     input::CuArray{ComplexF64, 4}
@@ -50,13 +50,13 @@ end
 
 # take the cross product of X-Space a,b vectors 
 # stores the result in (fourier space) `out` and then return the
-@views function cross!(
+@views function __cross!(
     parallel::P, 
-    a::Array{Float64, 4},
-    b::Array{Float64, 4},
+    a::XARRAY,
+    b::XARRAY
     ;
-    out::Array{ComplexF64, 4}
-) where P <: AbstractParallel
+    out::FARRAY
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4}
     fftn_mpi!(parallel, a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2], out[:, :, :, 1])
     fftn_mpi!(parallel, a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3], out[:, :, :, 2])
     fftn_mpi!(parallel, a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1], out[:, :, :, 3])
@@ -64,18 +64,26 @@ end
     nothing
 end
 
-@views function cross!(
+function cross!(
+    parallel::P, 
+    a::Array{Float64, 4},
+    b::Array{Float64, 4},
+    ;
+    out::Array{ComplexF64, 4}
+) where P <: AbstractParallel
+    __cross!(parallel, a, b, out = out);
+
+    nothing
+end
+
+function cross!(
     parallel::P, 
     a::CuArray{Float64, 4},
     b::CuArray{Float64, 4},
     ;
     out::CuArray{ComplexF64, 4}
 ) where P <: AbstractParallel
-    fftn_mpi!(parallel, a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2], out[:, :, :, 1])
-    fftn_mpi!(parallel, a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3], out[:, :, :, 2])
-    fftn_mpi!(parallel, a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1], out[:, :, :, 3])
-
-    nothing
+    __cross!(parallel, a, b, out = out);
 end
 
 function wavenumber_product!(arr::Array{ComplexF64, 3}, K::Wavenumbers; out::Array{ComplexF64, 4})

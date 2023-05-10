@@ -31,6 +31,7 @@ begin
         $U_hat,
     )
 
+    println("GPU full solver integration")
     display(r)
     println("\n");
 end
@@ -61,5 +62,6 @@ begin
         $U_hat,
     )
 
+    println("CPU full solver integration")
     display(r)
 end

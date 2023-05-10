@@ -9,4 +9,7 @@ test:
 	julia ./test/cuda.jl
 
 bench:
+	#julia ./benches/fft.jl
+	#julia ./benches/curl.jl
+	#julia ./benches/cross.jl
 	julia ./benches/cpu_gpu.jl
