@@ -8,14 +8,14 @@ using BenchmarkTools
 ######### GPU benchmark
 #########
 
-N = 256
+N = 128
 begin
     local parallel = markers.SingleThreadGPU()
 
     local K = mesh.wavenumbers_gpu(N)
-    local st = state.create_state_gpu(N, K)
-    local msh = mesh.new_mesh(N)
     local cfg = config.taylor_green_validation()
+    local st = state.create_state_gpu(N, K, cfg)
+    local msh = mesh.new_mesh(N)
     local ic = markers.TaylorGreen()
 
     local U = CuArray(zeros(N, N, N, 3))
@@ -31,7 +31,7 @@ begin
         $U_hat,
     )
 
-    show(r)
+    display(r)
     println("\n");
 end
 
@@ -43,9 +43,9 @@ begin
     local parallel = markers.SingleThreadCPU()
 
     local K = mesh.wavenumbers(N)
-    local st = state.create_state(N, K)
-    local msh = mesh.new_mesh(N)
     local cfg = config.taylor_green_validation()
+    local st = state.create_state(N, K, cfg)
+    local msh = mesh.new_mesh(N)
     local ic = markers.TaylorGreen()
 
     local U = zeros(N, N, N, 3)
@@ -61,5 +61,5 @@ begin
         $U_hat,
     )
 
-    show(r)
+    display(r)
 end

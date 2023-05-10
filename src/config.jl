@@ -1,49 +1,45 @@
 module config
 
-using ..markers: AbstractConfig
+using ..markers: AbstractConfig, ProductionConfig, ValidationConfig
 
 export Config, create_config, taylor_green_validation, calculate_dt
 
-struct Config <: AbstractConfig
+using CUDA
+
+struct Config{C <: AbstractConfig}
     ν::Float64
     re::Float64
     N::Int
     time::Float64
+    mode::C
 end
 
-struct ConfigValidation <: AbstractConfig
-    ν::Float64
-    re::Float64
-    N::Int
-    time::Float64
-end
-
-function create_config(N::Int, re::Float64, time::Float64)::Config
+function create_config(N::Int, re::Float64, time::Float64)::Config{ProductionConfig}
     ν = 1 / re
-
-    CFL_NUM = 0.75
-
-    return Config(ν, re, N, time)
+    return Config(ν, re, N, time, ProductionConfig())
 end
 
-function taylor_green_validation()::ConfigValidation
+function taylor_green_validation()::Config{ValidationConfig}
     N = 64
-    re = 1600
+    re = 1600.
     ν = 1 / re
 
     t = 0.1
 
-    return ConfigValidation(ν, re, N, t)
+    return Config(ν, re, N, t, ValidationConfig())
 end
 
-function calculate_dt(velocity::XARRAY, cfg::Config)::Float64 where XARRAY <: AbstractArray{Float64, 4}
+cfl_calc(max_velo::Float64, N::Int) = 0.75 / (N * max_velo)
+
+function calculate_dt(velocity::XARRAY, cfg::Config{ProductionConfig})::Float64 where XARRAY <: AbstractArray{Float64, 4}
     max_velo = maximum(velocity)
-    CFL = 0.75
-
-    return CFL / (cfg.N * max_velo)
+    return cfl_calc(max_velo, cfg.N)
 end
 
-function calculate_dt(velocity::XARRAY, cfg::ConfigValidation)::Float64 where XARRAY <: AbstractArray{Float64, 4}
+#
+# Validation dt cases
+#
+function calculate_dt(velocity::XARRAY, cfg::Config{ValidationConfig})::Float64 where XARRAY <: AbstractArray{Float64, 4}
     return 0.01
 end
 

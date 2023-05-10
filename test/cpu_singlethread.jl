@@ -42,9 +42,9 @@ end
     re = 40.
 
     K = mesh.wavenumbers(N)
-    st = state.create_state(N, K)
-    msh = mesh.new_mesh(N)
     cfg = config.create_config(N, re, 1.0)
+    st = state.create_state(N, K, cfg)
+    msh = mesh.new_mesh(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
@@ -68,7 +68,6 @@ end
             2,
             parallel,
             K,
-            cfg,
             U,
             U_hat,
             st
@@ -85,9 +84,9 @@ end
     time = 0.05
 
     K = mesh.wavenumbers(N)
-    st = state.create_state(N, K)
-    msh = mesh.new_mesh(N)
     cfg = config.create_config(N, re, time)
+    st = state.create_state(N, K, cfg)
+    msh = mesh.new_mesh(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
@@ -111,9 +110,9 @@ end
     N = 64
 
     K = mesh.wavenumbers(N)
-    st = state.create_state(N, K)
-    msh = mesh.new_mesh(N)
     cfg = config.taylor_green_validation()
+    st = state.create_state(N, K, cfg)
+    msh = mesh.new_mesh(N)
     ic = markers.TaylorGreen()
 
     U = zeros(N, N, N, 3)

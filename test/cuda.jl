@@ -6,8 +6,9 @@ using CUDA
 @testset "state.jl" begin
     N = 64
     K = mesh.wavenumbers_gpu(N)
+    cfg = config.create_config(N, 40., 0.00001)
     @test begin
-        st::state.StateGPU = state.create_state_gpu(N, K)
+        st::state.StateGPU = state.create_state_gpu(N, K, cfg)
         true
     end
 end
@@ -85,7 +86,8 @@ end
     re = 40.
 
     K = mesh.wavenumbers_gpu(N)
-    st = state.create_state_gpu(N, K)
+    cfg = config.create_config(N, 40., 0.00001)
+    st = state.create_state_gpu(N, K, cfg)
     msh = mesh.new_mesh(N)
     cfg = config.create_config(N, re, 1.0)
 
@@ -110,7 +112,6 @@ end
             2,
             parallel,
             K,
-            cfg,
             U,
             U_hat,
             st
@@ -125,9 +126,9 @@ end
     N = 64
 
     K = mesh.wavenumbers_gpu(N)
-    st = state.create_state_gpu(N, K)
     msh = mesh.new_mesh(N)
     cfg = config.taylor_green_validation()
+    st = state.create_state_gpu(N, K, cfg)
     ic = markers.TaylorGreen()
 
     U = CuArray(zeros(N, N, N, 3))
