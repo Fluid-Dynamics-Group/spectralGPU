@@ -9,6 +9,7 @@ FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 LazyGrids = "7031d0ef-c40d-4431-b2f8-61a8d2f650db"
 
 [compat]
+CUDA = "4"
 julia = "1"
 
 [extras]
