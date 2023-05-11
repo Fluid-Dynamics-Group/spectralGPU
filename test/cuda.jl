@@ -3,16 +3,35 @@ using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver
 using Test
 using CUDA
 
-@testset "state.jl" begin
+@testset "fft.jl planning" begin
     N = 64
+    parallel = markers.SingleThreadGPU();
     K = mesh.wavenumbers_gpu(N)
-    cfg = config.create_config(N, 40., 0.00001)
+    U = CuArray(zeros(N, N, N, 3))
+    U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+
     @test begin
-        st::state.StateGPU = state.create_state_gpu(N, K, cfg)
+        fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
         true
     end
 end
 
+@testset "state.jl" begin
+    parallel = markers.SingleThreadGPU()
+
+    N = 64
+    K = mesh.wavenumbers_gpu(N)
+    cfg = config.create_config(N, 40., 0.00001)
+
+    U = CuArray(zeros(N, N, N, 3))
+    U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
+    @test begin
+        st::state.StateGPU = state.create_state_gpu(N, K, cfg, plan)
+        true
+    end
+end
 
 @testset "cuda fft" begin
     parallel = markers.SingleThreadGPU()
@@ -86,13 +105,16 @@ end
     re = 40.
 
     K = mesh.wavenumbers_gpu(N)
+    U = CuArray(zeros(N, N, N, 3))
+    U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+
     cfg = config.create_config(N, 40., 0.00001)
-    st = state.create_state_gpu(N, K, cfg)
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    st = state.create_state_gpu(N, K, cfg, plan)
+
     msh = mesh.new_mesh(N)
     cfg = config.create_config(N, re, 1.0)
 
-    U = CuArray(zeros(N, N, N, 3))
-    U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
     # curl
     @test begin
@@ -126,13 +148,15 @@ end
     N = 64
 
     K = mesh.wavenumbers_gpu(N)
-    msh = mesh.new_mesh(N)
-    cfg = config.taylor_green_validation()
-    st = state.create_state_gpu(N, K, cfg)
-    ic = markers.TaylorGreen()
-
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    msh = mesh.new_mesh(N)
+    cfg = config.taylor_green_validation()
+    st = state.create_state_gpu(N, K, cfg, plan)
+    ic = markers.TaylorGreen()
+
     initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
 
     u_sum = sum(abs.(U))

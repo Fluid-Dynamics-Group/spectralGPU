@@ -8,7 +8,7 @@ using BenchmarkTools
 ######### GPU (forward) benchmark
 #########
 
-N = 64
+N = 128
 
 begin
     parallel = markers.SingleThreadGPU()

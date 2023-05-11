@@ -3,6 +3,7 @@ module state
 using ..mesh: Wavenumbers
 using ..markers: AbstractState, AbstractWavenumbers, AbstractConfig
 using ..config: Config
+using ..fft: Plan
 
 using CUDA
 
@@ -21,6 +22,7 @@ struct State <: AbstractState
     ν::Float64
     a::Vector{Float64}
     b::Vector{Float64}
+    fft_plan::Plan
 end
 
 struct StateGPU <: AbstractState
@@ -38,9 +40,10 @@ struct StateGPU <: AbstractState
     a::Vector{Float64}
     # RK integration constants
     b::Vector{Float64}
+    fft_plan::Plan
 end
 
-function create_state(N::Int, K::WAVE, config::Config{CFG})::State where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
+function create_state(N::Int, K::WAVE, config::Config{CFG}, plan::Plan)::State where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
     dU = ComplexF64.(zeros(K.kn, N, N, 3))
     U_hat₁ = ComplexF64.(zeros(K.kn, N, N, 3))
     U_hat₀ = ComplexF64.(zeros(K.kn, N, N, 3))
@@ -85,12 +88,13 @@ function create_state(N::Int, K::WAVE, config::Config{CFG})::State where WAVE <:
         wavenumber_product_tmp,
         config.ν,
         a,
-        b
+        b,
+        plan
     )
 end
 
-function create_state_gpu(N::Int, K::WAVE, config::Config{CFG})::StateGPU where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
-    cpu_state = create_state(N, K, config)
+function create_state_gpu(N::Int, K::WAVE, config::Config{CFG}, plan::Plan)::StateGPU where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
+    cpu_state = create_state(N, K, config, plan)
     dealias::Array{Int8, 3} = Array(cpu_state.dealias)
 
     return StateGPU(
@@ -109,6 +113,7 @@ function create_state_gpu(N::Int, K::WAVE, config::Config{CFG})::StateGPU where 
         #CuVector(cpu_state.b),
         cpu_state.a,
         cpu_state.b,
+        plan
     )
 end
 

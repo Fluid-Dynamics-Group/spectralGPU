@@ -11,6 +11,19 @@ using Test
     @test k.kz[1, 1, :] == k.kz[2, 2, :]
 end
 
+@testset "fft.jl planning" begin
+    N = 64
+    parallel = markers.SingleThreadCPU();
+    K = mesh.wavenumbers(N)
+    U = zeros(N, N, N, 3)
+    U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
+
+    @test begin
+        fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+        true
+    end
+end
+
 @testset "initial_condition.jl" begin
     parallel = markers.SingleThreadCPU()
     N = 64
@@ -42,12 +55,15 @@ end
     re = 40.
 
     K = mesh.wavenumbers(N)
-    cfg = config.create_config(N, re, 1.0)
-    st = state.create_state(N, K, cfg)
-    msh = mesh.new_mesh(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
+
+    cfg = config.create_config(N, re, 1.0)
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
+    st = state.create_state(N, K, cfg, plan)
+    msh = mesh.new_mesh(N)
 
     # curl
     @test begin
@@ -85,11 +101,13 @@ end
 
     K = mesh.wavenumbers(N)
     cfg = config.create_config(N, re, time)
-    st = state.create_state(N, K, cfg)
     msh = mesh.new_mesh(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
+    st = state.create_state(N, K, cfg, plan)
 
     # main solver call
     @test begin
@@ -111,13 +129,15 @@ end
 
     K = mesh.wavenumbers(N)
     cfg = config.taylor_green_validation()
-    st = state.create_state(N, K, cfg)
     msh = mesh.new_mesh(N)
     ic = markers.TaylorGreen()
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
     initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    st = state.create_state(N, K, cfg, plan)
 
     u_sum = sum(abs.(U))
     println("sum of all values in U is ", u_sum);
