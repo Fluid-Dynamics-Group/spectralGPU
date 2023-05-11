@@ -1,7 +1,7 @@
 module initial_condition
 
 using ..mesh: Mesh
-using ..fft: fftn_mpi!
+using ..fft: fftn_mpi!, Plan
 using ..markers: AbstractInitialCondition, AbstractParallel, TaylorGreen
 
 using CUDA
@@ -24,6 +24,7 @@ function setup_initial_condition(
     mesh::Mesh, 
     U::XARR,
     U_hat::FARR,
+    plan::Plan
 ) where P <: AbstractParallel where XARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4}
     @CUDA.sync U[:, :, :, 1] .= sin.(mesh.x) .* cos.(mesh.y) .* cos.(mesh.z)
     @CUDA.sync U[:, :, :, 2] .= cos.(mesh.x) .* sin.(mesh.y) .* cos.(mesh.z)
@@ -31,7 +32,7 @@ function setup_initial_condition(
     @CUDA.sync U[:, :, :, 3] .= 0.
 
     @views for i in 1:3
-        fftn_mpi!(parallel, U[:, :, :, i], U_hat[:, :, :, i])
+        fftn_mpi!(parallel, plan, U[:, :, :, i], U_hat[:, :, :, i])
     end
 end
 

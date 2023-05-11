@@ -69,7 +69,7 @@ function __integrate(
 
         # update U from the rk time integrated U_hat
         @views for i in 1:3
-            ifftn_mpi!(parallel, K, U_hat[:, :, :, i], U[:, :, :, i])
+            ifftn_mpi!(parallel, K, state.fft_plan, U_hat[:, :, :, i], U[:, :, :, i])
         end
     end
 end

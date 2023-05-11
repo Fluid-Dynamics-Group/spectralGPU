@@ -17,12 +17,13 @@ begin
 
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     msh = mesh.new_mesh(N)
     ic = markers.TaylorGreen()
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    r = @benchmark @views fft.fftn_mpi!($parallel, $U[:, :, :, 1], $U_hat[:, :, :, 1])
+    r = @benchmark @views fft.fftn_mpi!($parallel, $plan, $U[:, :, :, 1], $U_hat[:, :, :, 1])
 
     println("gpu forward FFT")
     display(r)
@@ -40,12 +41,13 @@ begin
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     msh = mesh.new_mesh(N)
     ic = markers.TaylorGreen()
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    r = @benchmark @views fft.fftn_mpi!($parallel, $U[:, :, :, 1], $U_hat[:, :, :, 1])
+    r = @benchmark @views fft.fftn_mpi!($parallel, $plan, $U[:, :, :, 1], $U_hat[:, :, :, 1])
 
     println("cpu forward FFT")
     display(r)
@@ -63,12 +65,13 @@ begin
 
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     msh = mesh.new_mesh(N)
     ic = markers.TaylorGreen()
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    r = @benchmark @views fft.ifftn_mpi!($parallel, $K, $U_hat[:, :, :, 1], $U[:, :, :, 1])
+    r = @benchmark @views fft.ifftn_mpi!($parallel, $K, $plan, $U_hat[:, :, :, 1], $U[:, :, :, 1])
 
     println("gpu inverse FFT")
     display(r)
@@ -86,12 +89,13 @@ begin
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     msh = mesh.new_mesh(N)
     ic = markers.TaylorGreen()
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    r = @benchmark @views fft.ifftn_mpi!($parallel, $K, $U_hat[:, :, :, 1], $U[:, :, :, 1])
+    r = @benchmark @views fft.ifftn_mpi!($parallel, $K, $plan, $U_hat[:, :, :, 1], $U[:, :, :, 1])
 
     println("cpu inverse FFT")
     display(r)

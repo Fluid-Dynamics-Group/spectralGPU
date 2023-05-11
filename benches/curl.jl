@@ -11,10 +11,12 @@ begin
     local re = 40.
     local K = mesh.wavenumbers_gpu(N)
     local cfg = config.create_config(N, re, 0.00001)
-    local st = state.create_state_gpu(N, K, cfg)
+    local U = CuArray(zeros(K.kn, N, N, 3))
     local U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+    local plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    local st = state.create_state_gpu(N, K, cfg, plan)
 
-    r = @benchmark solver.curl!($parallel, $K, $U_hat; out = $st.curl)
+    r = @benchmark solver.curl!($parallel, $K, $plan, $U_hat; out = $st.curl)
 
     println("GPU curl")
     display(r)
@@ -26,10 +28,12 @@ begin
     local re = 40.
     local K = mesh.wavenumbers(N)
     local cfg = config.create_config(N, re, 0.00001)
-    local st = state.create_state(N, K, cfg)
+    local U = zeros(K.kn, N, N, 3)
     local U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
+    local plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    local st = state.create_state(N, K, cfg, plan)
 
-    r = @benchmark solver.curl!($parallel, $K, $U_hat; out = $st.curl)
+    r = @benchmark solver.curl!($parallel, $K, $plan, $U_hat; out = $st.curl)
 
     println("CPU curl")
     display(r)

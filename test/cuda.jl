@@ -42,13 +42,15 @@ end
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
     @test begin
-        @views fft.fftn_mpi!(parallel, U[:, :, :, 1], U_hat[:, :, :, 1])
+        @views fft.fftn_mpi!(parallel, plan, U[:, :, :, 1], U_hat[:, :, :, 1])
         true
     end
 
     @test begin
-        @views fft.ifftn_mpi!(parallel, K, U_hat[:, :, :, 1], U[:, :, :, 1])
+        @views fft.ifftn_mpi!(parallel, K, plan, U_hat[:, :, :, 1], U[:, :, :, 1])
         true
     end
 end
@@ -67,7 +69,8 @@ end
     ic = markers.TaylorGreen()
     msh = mesh.new_mesh(N)
 
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
     u_hat_sum = sum(abs.(U_hat))
 
@@ -90,7 +93,7 @@ end
     # ensure the inverse FFT works equally well for CUDA arrays
     @test begin
         @views for i in 1:3
-            fft.ifftn_mpi!(parallel, K, U_hat[:, :, :, i], U_inverse[:, :, :, i])
+            fft.ifftn_mpi!(parallel, K, plan, U_hat[:, :, :, i], U_inverse[:, :, :, i])
         end
 
         diff = U - U_inverse
@@ -118,13 +121,13 @@ end
 
     # curl
     @test begin
-        solver.curl!(parallel, K, U_hat; out=st.curl)
+        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
         true
     end
 
     # cross
     @test begin
-        solver.cross!(parallel, U, st.curl; out = st.dU)
+        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
         true
     end
 
@@ -157,7 +160,7 @@ end
     st = state.create_state_gpu(N, K, cfg, plan)
     ic = markers.TaylorGreen()
 
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
     u_sum = sum(abs.(U))
     println("sum of all values in U is ", u_sum);

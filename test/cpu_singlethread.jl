@@ -34,10 +34,12 @@ end
 
     msh = mesh.new_mesh(N)
 
+    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
     # taylor green
     @test begin
         ic = markers.TaylorGreen()
-        initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
+        initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
         u_hat_sum = sum(abs.(U_hat))
 
         if u_hat_sum == 0
@@ -68,13 +70,13 @@ end
     # curl
     @test begin
         #solver.curl!(K, U_hat; out = st.curl[:, :, :, :])
-        solver.curl!(parallel, K, U_hat; out=st.curl)
+        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
         true
     end
 
     # cross
     @test begin
-        solver.cross!(parallel, U, st.curl; out = st.dU)
+        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
         true
     end
 
@@ -134,9 +136,10 @@ end
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat)
-
     plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
+    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+
     st = state.create_state(N, K, cfg, plan)
 
     u_sum = sum(abs.(U))
@@ -156,7 +159,7 @@ end
         )
 
         u_sum = sum(abs.(U))
-        println("sum of all values in U is ", u_sum);
+        println("after some integration, sum of all values in U is ", u_sum);
 
         k = (1/2) * sum(U .* U) * (1 / N)^3
         println("k is ", k)
