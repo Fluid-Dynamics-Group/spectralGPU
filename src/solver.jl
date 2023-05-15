@@ -22,13 +22,20 @@ using CUDA
 ) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where WAVE <: AbstractWavenumbers where FARRAY3 <: AbstractArray{ComplexF64, 3}
     j = complex(0, 1)
 
-    tmp[:, :, :] .= j*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1])
+    tmp[:, :, :] .= K[1].*input[:, :, :, 2] 
+    tmp[:, :, :] .-= K[2].*input[:, :, :, 1]
+    tmp .*= j
     ifftn_mpi!(parallel, K, plan, tmp, out[:, :, :, 3])
 
-    tmp[:, :, :] .= j*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3])
+    tmp[:, :, :] .= K[3].*input[:, :, :, 1] 
+    tmp[:, :, :] .-=  K[1].*input[:, :, :, 3]
+    tmp[:, :, :] .*= j
+
     ifftn_mpi!(parallel, K, plan, tmp, out[:, :, :, 2])
 
-    tmp[:, :, :] .= j*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2])
+    tmp[:, :, :] .= K[2].*input[:, :, :, 3] 
+    tmp[:, :, :] .-= K[3].*input[:, :, :, 2]
+    tmp[:, :, :] .*= j
     ifftn_mpi!(parallel, K, plan, tmp, out[:, :, :, 1])
 
     nothing
@@ -70,13 +77,16 @@ end
     out::FARRAY,
     tmp::XARRAY3
 ) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where XARRAY3 <: AbstractArray{Float64, 3}
-    tmp[:, :, :] .= a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2]
+    tmp[:, :, :] .= a[:, :, :, 2].*b[:, :, :, 3]
+    tmp[:, :, :] .-= a[:, :, :, 3].*b[:, :, :, 2]
     fftn_mpi!(parallel, plan, tmp, out[:, :, :, 1])
 
-    tmp[:, :, :] .= a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3]
+    tmp[:, :, :] .= a[:, :, :, 3].*b[:, :, :, 1]
+    tmp[:, :, :] .-= a[:, :, :, 1].*b[:, :, :, 3]
     fftn_mpi!(parallel, plan, tmp, out[:, :, :, 2])
 
-    tmp[:, :, :] .= a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1]
+    tmp[:, :, :] .= a[:, :, :, 1].*b[:, :, :, 2]
+    tmp[:, :, :] .-= a[:, :, :, 2].*b[:, :, :, 1]
     fftn_mpi!(parallel, plan, tmp, out[:, :, :, 3])
 
     nothing
