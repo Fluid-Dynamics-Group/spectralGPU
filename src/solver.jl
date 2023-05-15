@@ -17,13 +17,19 @@ using CUDA
     plan::Plan,
     input::FARRAY
     ;
-    out::XARRAY
-) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where WAVE <: AbstractWavenumbers
+    out::XARRAY,
+    tmp::FARRAY3
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where WAVE <: AbstractWavenumbers where FARRAY3 <: AbstractArray{ComplexF64, 3}
     j = complex(0, 1)
 
-    ifftn_mpi!(parallel, K, plan, j*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1]), out[:, :, :, 3])
-    ifftn_mpi!(parallel, K, plan, j*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3]), out[:, :, :, 2])
-    ifftn_mpi!(parallel, K, plan, j*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2]), out[:, :, :, 1])
+    tmp[:, :, :] .= j*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1])
+    ifftn_mpi!(parallel, K, plan, tmp, out[:, :, :, 3])
+
+    tmp[:, :, :] .= j*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3])
+    ifftn_mpi!(parallel, K, plan, tmp, out[:, :, :, 2])
+
+    tmp[:, :, :] .= j*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2])
+    ifftn_mpi!(parallel, K, plan, tmp, out[:, :, :, 1])
 
     nothing
 end
@@ -34,9 +40,10 @@ function curl!(
     plan::Plan,
     input::Array{ComplexF64, 4}
     ;
-    out::Array{Float64, 4}
+    out::Array{Float64, 4},
+    tmp::Array{ComplexF64, 3}
 ) where P <: AbstractParallel
-    __curl!(parallel, K, plan, input, out = out);
+    __curl!(parallel, K, plan, input; out = out, tmp=tmp);
 end
 
 function curl!(
@@ -45,9 +52,10 @@ function curl!(
     plan::Plan,
     input::CuArray{ComplexF64, 4}
     ;
-    out::CuArray{Float64, 4}
+    out::CuArray{Float64, 4},
+    tmp::CuArray{ComplexF64, 3}
 ) where P <: AbstractParallel
-    __curl!(parallel, K, plan, input, out = out);
+    __curl!(parallel, K, plan, input; out = out, tmp = tmp);
 end
 
 
@@ -59,11 +67,17 @@ end
     a::XARRAY,
     b::XARRAY
     ;
-    out::FARRAY
-) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4}
-    fftn_mpi!(parallel, plan, a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2], out[:, :, :, 1])
-    fftn_mpi!(parallel, plan, a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3], out[:, :, :, 2])
-    fftn_mpi!(parallel, plan, a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1], out[:, :, :, 3])
+    out::FARRAY,
+    tmp::XARRAY3
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where XARRAY3 <: AbstractArray{Float64, 3}
+    tmp[:, :, :] .= a[:, :, :, 2].*b[:, :, :, 3] .- a[:, :, :, 3].*b[:, :, :, 2]
+    fftn_mpi!(parallel, plan, tmp, out[:, :, :, 1])
+
+    tmp[:, :, :] .= a[:, :, :, 3].*b[:, :, :, 1] .- a[:, :, :, 1].*b[:, :, :, 3]
+    fftn_mpi!(parallel, plan, tmp, out[:, :, :, 2])
+
+    tmp[:, :, :] .= a[:, :, :, 1].*b[:, :, :, 2] .- a[:, :, :, 2].*b[:, :, :, 1]
+    fftn_mpi!(parallel, plan, tmp, out[:, :, :, 3])
 
     nothing
 end
@@ -74,9 +88,10 @@ function cross!(
     a::Array{Float64, 4},
     b::Array{Float64, 4},
     ;
-    out::Array{ComplexF64, 4}
+    out::Array{ComplexF64, 4},
+    tmp::Array{Float64, 3},
 ) where P <: AbstractParallel
-    __cross!(parallel, plan, a, b, out = out);
+    __cross!(parallel, plan, a, b, out = out, tmp=tmp);
 
     nothing
 end
@@ -87,9 +102,10 @@ function cross!(
     a::CuArray{Float64, 4},
     b::CuArray{Float64, 4},
     ;
-    out::CuArray{ComplexF64, 4}
+    out::CuArray{ComplexF64, 4},
+    tmp::CuArray{Float64, 3},
 ) where P <: AbstractParallel
-    __cross!(parallel, plan, a, b, out = out);
+    __cross!(parallel, plan, a, b, out = out, tmp=tmp);
 end
 
 function wavenumber_product!(arr::Array{ComplexF64, 3}, K::Wavenumbers; out::Array{ComplexF64, 4})
@@ -141,8 +157,8 @@ function __compute_rhs!(
         end
     end
 
-    curl!(parallel, K, state.fft_plan, U_hat; out = state.curl)
-    cross!(parallel, state.fft_plan, U, state.curl; out = state.dU)
+    curl!(parallel, K, state.fft_plan, U_hat; out = state.curl, tmp=state.curl_tmp)
+    cross!(parallel, state.fft_plan, U, state.curl; out = state.dU, tmp = state.cross_tmp)
     state.dU .*= state.dealias
 
     state.P_hat[:, :, :] .= complex(0., 0);

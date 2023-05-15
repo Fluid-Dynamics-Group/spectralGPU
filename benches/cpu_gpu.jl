@@ -8,7 +8,7 @@ using BenchmarkTools
 ######### GPU benchmark
 #########
 
-N = 256
+N = 128
 begin
     local parallel = markers.SingleThreadGPU()
 

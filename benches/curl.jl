@@ -16,7 +16,7 @@ begin
     local plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
     local st = state.create_state_gpu(N, K, cfg, plan)
 
-    r = @benchmark solver.curl!($parallel, $K, $plan, $U_hat; out = $st.curl)
+    r = @benchmark solver.curl!($parallel, $K, $plan, $U_hat; out = $st.curl, tmp=$st.curl_tmp)
 
     println("GPU curl")
     display(r)
@@ -33,7 +33,7 @@ begin
     local plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
     local st = state.create_state(N, K, cfg, plan)
 
-    r = @benchmark solver.curl!($parallel, $K, $plan, $U_hat; out = $st.curl)
+    r = @benchmark solver.curl!($parallel, $K, $plan, $U_hat; out = $st.curl, tmp=$st.curl_tmp)
 
     println("CPU curl")
     display(r)

@@ -16,7 +16,7 @@ begin
     local plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
     local st = state.create_state_gpu(N, K, cfg, plan)
 
-    r = @benchmark solver.cross!($parallel, $plan, $U, $st.curl; out = $st.dU)
+    r = @benchmark solver.cross!($parallel, $plan, $U, $st.curl; out = $st.dU, tmp = $st.cross_tmp)
 
     println("GPU cross")
     display(r)
@@ -33,7 +33,7 @@ begin
     local plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
     local st = state.create_state(N, K, cfg, plan)
 
-    r = @benchmark solver.cross!($parallel, $plan, $U, $st.curl; out = $st.dU)
+    r = @benchmark solver.cross!($parallel, $plan, $U, $st.curl; out = $st.dU, tmp = $st.cross_tmp)
 
     println("CPU cross")
     display(r)

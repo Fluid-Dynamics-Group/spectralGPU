@@ -70,13 +70,13 @@ end
     # curl
     @test begin
         #solver.curl!(K, U_hat; out = st.curl[:, :, :, :])
-        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
+        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl, tmp = st.curl_tmp)
         true
     end
 
     # cross
     @test begin
-        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
+        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU, tmp = st.cross_tmp)
         true
     end
 

@@ -19,6 +19,8 @@ struct State <: AbstractState
     K²::Array{Int, 3}
     K_over_K²::Array{Float64, 4}
     wavenumber_product_tmp::Array{ComplexF64, 4}
+    curl_tmp::Array{ComplexF64, 3}
+    cross_tmp::Array{Float64, 3}
     ν::Float64
     a::Vector{Float64}
     b::Vector{Float64}
@@ -35,6 +37,8 @@ struct StateGPU <: AbstractState
     K²::CuArray{Int, 3}
     K_over_K²::CuArray{Float64, 4}
     wavenumber_product_tmp::CuArray{ComplexF64, 4}
+    curl_tmp::CuArray{ComplexF64, 3}
+    cross_tmp::CuArray{Float64, 3}
     ν::CuVector{Float64}
     # RK integration constants
     a::Vector{Float64}
@@ -51,6 +55,8 @@ function create_state(N::Int, K::WAVE, config::Config{CFG}, plan::Plan)::State w
     curl = zeros(N, N, N, 3)
     P_hat = ComplexF64.(zeros(K.kn, N, N))
     wavenumber_product_tmp = ComplexF64.(zeros(K.kn, N, N, 3))
+    curl_tmp = ComplexF64.(zeros(K.kn, N, N))
+    cross_tmp = zeros(N, N, N)
 
     K² = Array(K[1].^2 + K[2].^2 + K[3].^2)
 
@@ -86,6 +92,8 @@ function create_state(N::Int, K::WAVE, config::Config{CFG}, plan::Plan)::State w
         K²,
         K_over_K²,
         wavenumber_product_tmp,
+        curl_tmp,
+        cross_tmp,
         config.ν,
         a,
         b,
@@ -108,6 +116,8 @@ function create_state_gpu(N::Int, K::WAVE, config::Config{CFG}, plan::Plan)::Sta
         CuArray(cpu_state.K²),
         CuArray(cpu_state.K_over_K²),
         CuArray(cpu_state.wavenumber_product_tmp),
+        CuArray(cpu_state.curl_tmp),
+        CuArray(cpu_state.cross_tmp),
         CuVector([cpu_state.ν]),
         #CuVector(cpu_state.a),
         #CuVector(cpu_state.b),
