@@ -51,7 +51,6 @@ function curl!(
     __curl!(parallel, K, plan, input, out = out);
 end
 
-
 # take the cross product of X-Space a,b vectors 
 # stores the result in (fourier space) `out` and then return the
 @views function __cross!(
@@ -83,7 +82,7 @@ function cross!(
 end
 
 function cross!(
-    parallel::P, 
+    parallel::P,
     plan::Plan,
     a::CuArray{Float64, 4},
     b::CuArray{Float64, 4},

@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate, Forcing
+using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate, Forcing, Io
 using Test
 
 @testset "mesh.jl" begin
@@ -9,6 +9,82 @@ using Test
     @test k.kx[:, 1, 1] == k.kx[:, 2, 2]
     @test k.ky[1, :, 1] == k.ky[2, :, 2]
     @test k.kz[1, 1, :] == k.kz[2, 2, :]
+end
+
+@testset "io.jl" begin
+    @test_throws ErrorException begin
+        never = Io.never_write()
+        Io.step_number(never)
+    end
+
+    @test begin
+        dt_write = Io.dt_write(0.1)
+        Io.step_number(dt_write) == 1
+    end
+
+    #
+    # individual timestep checks
+    #
+
+    @test begin
+        # stepper dt is larger than solver dt, but we want to write the initial timestep
+        # regardless
+        dt_write = Io.dt_write(0.6)
+        solver_dt = 0.5
+        current_solver_time = 10.0
+        Io.should_write(dt_write, current_solver_time) == true 
+    end
+
+    @test begin
+        # stepper dt is smaller than solver dt, it should naturally write the first step
+        dt_write = Io.dt_write(0.1)
+        solver_dt = 0.5
+        current_solver_time = 10.0
+        Io.should_write(dt_write, current_solver_time) == true 
+    end
+
+    @test begin
+        # stepper dt is smaller than solver dt, it should also write the second step
+        dt_write = Io.dt_write(0.1)
+
+        solver_dt = 0.5
+        current_solver_time = 10.0
+
+        Io.increase_step(dt_write)
+
+        # check for the second step
+        Io.should_write(dt_write, current_solver_time) == true 
+    end
+
+    #
+    # total number of writes checks
+    #
+    @test begin
+        never = Io.never_write()
+        Io.num_writes(never, 0.1, 10.0) == 0
+    end
+
+    @test begin
+        dt_write = Io.dt_write(0.1)
+        solver_dt = 0.01
+        solver_t = 10.0
+        writes = Io.num_writes(dt_write, solver_dt, solver_t)
+        Io.num_writes(dt_write, solver_dt, solver_t) == 100
+    end
+
+    @test begin
+        dt_write = Io.dt_write(0.1)
+        solver_dt = 0.5
+        solver_t = 10.0
+        Io.num_writes(dt_write, solver_dt, solver_t) == 20
+    end
+
+    @test begin
+        dt_write = Io.dt_write(0.1)
+        solver_dt = 0.5
+        solver_t = 10.01
+        Io.num_writes(dt_write, solver_dt, solver_t) == 21
+    end
 end
 
 @testset "fft.jl planning" begin

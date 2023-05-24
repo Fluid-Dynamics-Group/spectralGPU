@@ -1,6 +1,7 @@
 module spectralGPU
 
 include("./markers.jl")
+include("./io.jl")
 include("./mesh.jl")
 include("./fft.jl")
 include("./initial_condition.jl")
