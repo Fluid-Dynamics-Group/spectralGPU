@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate
+using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate, Forcing
 using Test
 using CUDA
 
@@ -118,6 +118,7 @@ end
     msh = mesh.new_mesh(N)
     cfg = config.create_config(N, re, 1.0)
 
+    forcing = Forcing.Unforced();
 
     # curl
     @test begin
@@ -139,7 +140,8 @@ end
             K,
             U,
             U_hat,
-            st
+            st,
+            forcing
         )
         true
     end
@@ -160,6 +162,8 @@ end
     st = state.create_state_gpu(N, K, cfg, plan)
     ic = markers.TaylorGreen()
 
+    forcing = Forcing.Unforced();
+
     initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
     u_sum = sum(abs.(U))
@@ -176,6 +180,7 @@ end
             st,
             U,
             U_hat,
+            forcing
         )
 
         u_sum = sum(abs.(U))

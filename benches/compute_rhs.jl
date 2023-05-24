@@ -4,7 +4,7 @@ using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver
 using CUDA
 using BenchmarkTools
 
-N = 128
+N = 256
 
 begin
     local rk_step = 2

@@ -30,11 +30,16 @@ export AbstractWavenumbers
 abstract type AbstractWavenumbers end
 
 # Config
-export AbstractConfig
+export AbstractConfig, ProductionConfig, ValidationConfig
 
 abstract type AbstractConfig end
 struct ProductionConfig <: AbstractConfig end
 struct ValidationConfig <: AbstractConfig end
+
+# forcing
+export AbstractForcing
+
+abstract type AbstractForcing end
 
 #
 end

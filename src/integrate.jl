@@ -1,6 +1,6 @@
 module Integrate
 
-using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig
+using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig, AbstractForcing
 using ..fft: ifftn_mpi!, fftn_mpi!
 using ..mesh: Wavenumbers, WavenumbersGPU
 using ..state: State, StateGPU
@@ -15,9 +15,10 @@ function integrate(
     config::Config{CFG}, 
     state::State,
     U::Array{Float64, 4}, 
-    U_hat::Array{ComplexF64, 4}
-) where P<: AbstractParallel where CFG  <: AbstractConfig
-    __integrate(parallel, K, config, state, U, U_hat)
+    U_hat::Array{ComplexF64, 4},
+    forcing::FORCING
+) where P<: AbstractParallel where CFG  <: AbstractConfig where FORCING <: AbstractForcing
+    __integrate(parallel, K, config, state, U, U_hat, forcing)
 end
 
 function integrate(
@@ -26,9 +27,10 @@ function integrate(
     config::Config{CFG},
     state::StateGPU,
     U::CuArray{Float64, 4}, 
-    U_hat::CuArray{ComplexF64, 4}
-) where P<: AbstractParallel where CFG  <: AbstractConfig
-    __integrate(parallel, K, config, state, U, U_hat)
+    U_hat::CuArray{ComplexF64, 4},
+    forcing::FORCING
+) where P<: AbstractParallel where CFG  <: AbstractConfig where FORCING <: AbstractForcing
+    __integrate(parallel, K, config, state, U, U_hat, forcing)
 end
 
 function __integrate(
@@ -38,15 +40,14 @@ function __integrate(
     state::STATE,
     U::XARRAY,
     U_hat::FARRAY,
-) where P<: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers where CFG  <: AbstractConfig
+    forcing::FORCING
+) where P<: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers where CFG  <: AbstractConfig where FORCING <: AbstractForcing
     t = 0
     tstep = 0
 
     dt = calculate_dt(U, config)
 
     while t < config.time - 1e-8
-        #println("stepping");
-
         t += dt
         tstep += 1
 
@@ -54,7 +55,7 @@ function __integrate(
         state.U_hat₀[:, :, :, :] .= U_hat[:, :, :, :]
 
         for rk_step in 1:4
-            compute_rhs!(rk_step, parallel, K, U, U_hat, state)
+            compute_rhs!(rk_step, parallel, K, U, U_hat, state, forcing)
 
             #println("du abs change: ", sum(abs.(state.dU)))
 

@@ -9,8 +9,12 @@ test:
 	julia ./test/cuda.jl
 
 bench:
+	#julia ./benches/cuda.jl
 	#julia ./benches/fft.jl
 	#julia ./benches/curl.jl
 	#julia ./benches/cross.jl
-	#julia ./benches/compute_rhs.jl
-	julia ./benches/cpu_gpu.jl
+	julia ./benches/compute_rhs.jl
+	#julia ./benches/cpu_gpu.jl
+
+pluto:
+	cd pluto && julia -e "using Pluto; Pluto.run()"

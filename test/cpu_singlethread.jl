@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate
+using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate, Forcing
 using Test
 
 @testset "mesh.jl" begin
@@ -67,6 +67,8 @@ end
     st = state.create_state(N, K, cfg, plan)
     msh = mesh.new_mesh(N)
 
+    forcing = Forcing.Unforced();
+
     # curl
     @test begin
         #solver.curl!(K, U_hat; out = st.curl[:, :, :, :])
@@ -88,7 +90,8 @@ end
             K,
             U,
             U_hat,
-            st
+            st,
+            forcing
         )
         true
     end
@@ -111,6 +114,8 @@ end
 
     st = state.create_state(N, K, cfg, plan)
 
+    forcing = Forcing.Unforced();
+
     # main solver call
     @test begin
         Integrate.integrate(
@@ -120,6 +125,7 @@ end
             st,
             U,
             U_hat,
+            forcing
         )
         true
     end
@@ -128,6 +134,8 @@ end
 @testset "integrate.jl - checked" begin
     parallel = markers.SingleThreadCPU()
     N = 64
+
+    forcing = Forcing.Unforced();
 
     K = mesh.wavenumbers(N)
     cfg = config.taylor_green_validation()
@@ -156,6 +164,7 @@ end
             st,
             U,
             U_hat,
+            forcing
         )
 
         u_sum = sum(abs.(U))

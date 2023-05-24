@@ -7,6 +7,8 @@ include("./initial_condition.jl")
 include("./config.jl")
 include("./state.jl")
 
+include("./forcing.jl")
+
 include("./solver.jl")
 include("./integrate.jl")
 

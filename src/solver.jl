@@ -2,11 +2,12 @@ module solver
 
 export curl!, cross!, compute_rhs!
 
-using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig
+using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig, AbstractForcing
 using ..fft: ifftn_mpi!, fftn_mpi!, Plan
 using ..mesh: Wavenumbers, WavenumbersGPU
 using ..state: State, StateGPU
 using ..config: Config
+using ..Forcing: force_system
 
 using CUDA
 
@@ -110,9 +111,10 @@ function compute_rhs!(
     K::WavenumbersGPU,
     U::CuArray{Float64, 4},
     U_hat::CuArray{ComplexF64, 4},
-    state::StateGPU
-) where P <: AbstractParallel
-    __compute_rhs!(rk_step, parallel, K, U, U_hat, state)
+    state::StateGPU,
+    forcing::FORCING
+) where P <: AbstractParallel where FORCING <: AbstractForcing
+    __compute_rhs!(rk_step, parallel, K, U, U_hat, state, forcing)
 end
 
 function compute_rhs!(
@@ -121,9 +123,10 @@ function compute_rhs!(
     K::Wavenumbers,
     U::Array{Float64, 4},
     U_hat::Array{ComplexF64, 4},
-    state::State
-) where P <: AbstractParallel
-    __compute_rhs!(rk_step, parallel, K, U, U_hat, state)
+    state::State,
+    forcing::FORCING
+) where P <: AbstractParallel where FORCING <: AbstractForcing
+    __compute_rhs!(rk_step, parallel, K, U, U_hat, state, forcing)
 end
 
 function __compute_rhs!(
@@ -132,8 +135,9 @@ function __compute_rhs!(
     K::WAVE,
     U::ARRAY,
     U_hat::FARRAY,
-    state::STATE
-) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where ARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers
+    state::STATE,
+    forcing::FORCING
+) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where ARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers where FORCING <: AbstractForcing
 
     if rk_step != 1
         @views for i in 1:3
@@ -149,7 +153,11 @@ function __compute_rhs!(
     # compute P_hat = sum(dU * K_over_K²):
     sum!(state.P_hat, state.dU .* state.K_over_K²)
 
-    # TODO: make any adjustments to the forcing vector
+    # compute forcing
+    forcing_term = force_system(parallel, forcing, U_hat, U)
+    if forcing_term != nothing
+        sum!(state.P_hat, forcing_term .* state.K_over_K²)
+    end
     
     # add Pressure term to dU/dt
     wavenumber_product!(state.P_hat, K; out = state.wavenumber_product_tmp)
