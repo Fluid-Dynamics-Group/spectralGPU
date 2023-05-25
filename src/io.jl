@@ -2,7 +2,8 @@ module Io
 
 export never_write, dt_write, step_number, should_write, increase_step
 
-using ..markers: AbstractIoStepControl
+using ..markers: AbstractIoStepControl, AbstractIoExport
+using Printf
 
 struct NeverWrite <: AbstractIoStepControl
 end
@@ -71,7 +72,7 @@ function should_write(stepper::DtWrite, time::Float64)::Bool
 end
 
 # bump the step number for the next write
-function increase_step(stepper::DtWrite)
+function increase_step!(stepper::DtWrite)
     stepper.step_number += 1
 
     # ensure this is false 
@@ -79,7 +80,19 @@ function increase_step(stepper::DtWrite)
 end
 
 # bump the step number for the next write (errors)
-increase_step(stepper::NeverWrite) = error("increase_step should never be called since this data should not be exported")
+increase_step!(stepper::NeverWrite) = error("increase_step should never be called since this data should not be exported")
+
+#
+# Export functions
+#
+
+function get_stepper(exporter::EXPORT) where EXPORT <: AbstractIoExport
+    error(@sprintf "get_stepper not implemented for exporter `%s` Ensure that you satisfy this interface." typeof(exporter))
+end
+
+function export_data(exporter::EXPORT, time::Float64) where EXPORT <: AbstractIoExport
+    error(@sprintf "export_data not implemented for stepper `%s` and exporter `%s`. Ensure that you satisfy this interface." typeof(stepper), typeof(exporter))
+end
 
 #
 end

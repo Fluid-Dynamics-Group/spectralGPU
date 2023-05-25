@@ -50,7 +50,7 @@ end
         solver_dt = 0.5
         current_solver_time = 10.0
 
-        Io.increase_step(dt_write)
+        Io.increase_step!(dt_write)
 
         # check for the second step
         Io.should_write(dt_write, current_solver_time) == true 
@@ -201,7 +201,8 @@ end
             st,
             U,
             U_hat,
-            forcing
+            forcing,
+            Vector{markers.AbstractIoExport}()
         )
         true
     end
@@ -240,7 +241,8 @@ end
             st,
             U,
             U_hat,
-            forcing
+            forcing,
+            Vector{markers.AbstractIoExport}(),
         )
 
         u_sum = sum(abs.(U))

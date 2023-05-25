@@ -11,6 +11,7 @@ include("./state.jl")
 include("./forcing.jl")
 
 include("./solver.jl")
+include("./exporters.jl")
 include("./integrate.jl")
 
 export fft

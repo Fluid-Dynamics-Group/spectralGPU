@@ -21,10 +21,10 @@ end
 
 # blanket function for unforced systems
 function force_system(
-        parallel::P,
-        forcing::Unforced,
-        U_hat::FARRAY,
-        U::XARRAY
+    parallel::P,
+    forcing::Unforced,
+    U_hat::FARRAY,
+    U::XARRAY
 )::Union{FARRAY, Nothing} where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where P <: AbstractParallel
     # return no forcing, always
     nothing

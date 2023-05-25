@@ -11,6 +11,9 @@ begin
 	using FFTW
 end
 
+# ╔═╡ a84decbd-bb3e-4c6e-825a-8175f8a1323f
+using Printf
+
 # ╔═╡ eeca97f1-2c0f-4d0a-a153-03896c7ec818
 function ingredients(path::String)
 	# this is from the Julia source code (evalfile in base/loading.jl)
@@ -27,59 +30,140 @@ function ingredients(path::String)
 end
 
 # ╔═╡ b98d3b17-2ec1-4909-bd6f-69ab7db513ba
-solver = ingredients("/home/brooks/github/spectralGPU/src/spectralGPU.jl").spectralGPU
+const solver = ingredients("/home/brooks/github/spectralGPU/src/spectralGPU.jl").spectralGPU
 
-# ╔═╡ f2684b3b-17e0-46d6-bcb7-1b3a44a49638
-const N = 64
-
-# ╔═╡ d3ac42f6-9ef2-4955-aeab-d62d59162769
-const RE::Float64 = 40;
-
-# ╔═╡ 8c3ae401-35d2-4f0f-aa9d-78d219b4aba2
-const parallel = solver.markers.SingleThreadGPU();
-
-# ╔═╡ 14c05848-2ae5-4850-b3c8-2661cf087d4d
-const K = solver.mesh.wavenumbers_gpu(N)
-
-# ╔═╡ 8c98f86d-2232-4825-898b-a5310b4b0e2f
-const ic = solver.markers.TaylorGreen()
-
-# ╔═╡ 75ca5b35-f294-4bea-9039-d61243a41161
-const config = solver.config.create_config(N, RE, 15.0)
-
-# ╔═╡ 22937e02-08d6-4a3d-87ad-cb62cf2e56cc
-const mesh = solver.mesh.new_mesh(N)
-
-# ╔═╡ d146b03e-4063-4110-9b27-f5c9333e5bf5
-begin
-	const U = CuArray(zeros(N, N, N, 3));
-	const U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)));
-	const plan = solver.fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
-	solver.initial_condition.setup_initial_condition(parallel, ic, mesh, U, U_hat, plan)
-
-	const state = solver.state.create_state_gpu(N, K, config, plan)
-end
+# ╔═╡ e80ecd4b-04b4-499f-b2f5-c4700a1aa824
+AbstractParallel = solver.markers.AbstractParallel
 
 # ╔═╡ 2ff6c22a-9af8-4692-b71a-531dd9d4ea7a
 struct EnergyHelicityForcing <: solver.markers.AbstractForcing
 	state::solver.state.StateGPU
+	K::solver.mesh.WavenumbersGPU
+	ϵ₁::Float64
+	ϵ₂::Float64
+	f₁::CuArray{Float64, 4}
+	f₂::CuArray{Float64, 4}
+	fᵤ::CuArray{Float64, 4}
+	f̂ᵤ::CuArray{ComplexF64, 4}
+end
+
+# ╔═╡ 4e266c4e-8717-459d-8077-d146787c78c9
+function dot_arr(A::T, B::T) where T <: AbstractArray{Float64, 4}
+	dropdims(sum(A .* B; dims=4); dims = 4)
 end
 
 # ╔═╡ a0746796-d7c3-4aac-904e-db4376cb2e2b
 function solver.Forcing.force_system(
 	parallel::solver.markers.SingleThreadGPU, 
-	forcing::EnergyHelicityForcing, 
+	forcing::EnergyHelicityForcing,
 	U_hat::CuArray{ComplexF64,4}, 
 	U::CuArray{Float64, 4}
 )::Union{CuArray{ComplexF64,4}, Nothing}
-	nothing
+	ω = forcing.state.curl
+
+	solver.solver.curl!(parallel, forcing.K, forcing.state.fft_plan, U_hat; out = ω)
+
+	u_dot_ω = dot_arr(ω, U)
+	u_dot_u = dot_arr(U, U)
+	ω_dot_ω = dot_arr(ω, ω)
+
+	forcing.f₁[:, :, :, :] .= (u_dot_ω .* ω) .- (ω_dot_ω .* U)
+	forcing.f₂[:, :, :, :] .= (u_dot_ω .* U) .- (u_dot_u .* ω)
+	forcing.fᵤ[:, :, :, :] .= forcing.ϵ₁ .* forcing.f₁ .+ forcing.ϵ₂ .* forcing.f₂
+
+	# forward transform to fourier space
+	@views for i in 1:3
+		solver.fft.fftn_mpi!(parallel, forcing.state.fft_plan, forcing.fᵤ[:, :, :, i], forcing.f̂ᵤ[:, :, :, i])
+	end
+
+	# println(sum(abs.(forcing.fᵤ)))
+	# println(sum(abs.(forcing.f̂ᵤ)))
+	forcing.f̂ᵤ
 end
 
-# ╔═╡ d5b541fd-ec86-4181-913d-6afb4d24163f
-const forcing = EnergyHelicityForcing(state)
+# ╔═╡ dc128551-a0fc-4c9e-8675-05d05255452a
+function run_solver(N)#::Array{Float64, 4}
+	RE::Float64 = 40;
+	parallel = solver.markers.SingleThreadGPU();
+	K = solver.mesh.wavenumbers_gpu(N)
+	ic = solver.markers.TaylorGreen()
 
-# ╔═╡ 5227a52f-f58a-49ac-a237-685966bc9b43
-@time solver.Integrate.integrate(parallel, K, config, state, U, U_hat, forcing); sum(U)
+	runtime = 15.1
+	config = solver.config.create_config(N, RE, runtime)
+	mesh = solver.mesh.new_mesh(N)
+	
+	U = CuArray(zeros(N, N, N, 3));
+	U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)));
+	plan = solver.fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+	solver.initial_condition.setup_initial_condition(parallel, ic, mesh, U, U_hat, plan)
+
+	state = solver.state.create_state_gpu(N, K, config, plan)
+
+	# for δ = 0.1
+	ϵ₁ = 0.
+	# ϵ₂ = -2056376780.8170705
+	ϵ₂ = 100.
+	f₁ = CuArray(zeros(N, N, N, 3))
+	f₂ = CuArray(zeros(N, N, N, 3))
+	fᵤ = CuArray(zeros(N, N, N, 3))
+	f̂ᵤ = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
+	
+	forcing = EnergyHelicityForcing(state, K, ϵ₁, ϵ₂, f₁, f₂, fᵤ, f̂ᵤ)
+	# forcing = solver.Forcing.Unforced();
+	
+	energy_export = solver.Exporters.EnergyExport(
+		N,
+		solver.Io.dt_write(0.1),
+		Vector{Float64}(),
+		U
+	)
+	helicity_export = solver.Exporters.HelicityExport(
+		N,
+		parallel,
+		K,
+		plan,
+		solver.Io.dt_write(0.1),
+		Vector{Float64}(),
+		U_hat,
+		U,
+		state.curl
+	)
+	exports::Vector{solver.markers.AbstractIoExport} = [
+		energy_export,
+		helicity_export
+	]
+	
+	solver.Integrate.integrate(parallel, K, config, state, U, U_hat, forcing, exports);
+
+	u_cpu = Array(U)
+
+	CUDA.unsafe_free!(U)
+	CUDA.unsafe_free!(U_hat)
+	CUDA.unsafe_free!(state.dU)
+	CUDA.unsafe_free!(state.U_hat₁)
+	CUDA.unsafe_free!(state.U_hat₀)
+	CUDA.unsafe_free!(state.curl)
+	CUDA.unsafe_free!(state.dealias)
+	CUDA.unsafe_free!(state.P_hat)
+	CUDA.unsafe_free!(state.K²)
+	CUDA.unsafe_free!(state.K_over_K²)
+	CUDA.unsafe_free!(state.wavenumber_product_tmp)
+	CUDA.unsafe_free!(state.ν)
+
+	energy_export.history, helicity_export.history
+end
+
+# ╔═╡ 66f794ab-0b4e-4403-a1e0-83e3a6b4cb18
+# @time run_solver(128)
+
+# ╔═╡ 94ccf9c1-5822-4df5-b00f-30a25cc500ca
+@time run_solver(64)
+
+# ╔═╡ 799ab477-3174-49e0-99a2-e0cd1cda6747
+# @time run_solver(128)
+
+# ╔═╡ 025845a1-6607-497f-b04b-33674a7600de
+# @time run_solver(256)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -87,6 +171,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 LazyGrids = "7031d0ef-c40d-4431-b2f8-61a8d2f650db"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
 CUDA = "~4.2.0"
@@ -100,7 +185,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.0"
 manifest_format = "2.0"
-project_hash = "e8ded2c7e0ea2e5f4ff6a367c29a2ab2b712de11"
+project_hash = "6c118cc88d33d203bcae27f54eda93bb79cc6e34"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -538,19 +623,17 @@ version = "17.4.0+0"
 
 # ╔═╡ Cell order:
 # ╠═697c720a-f9b9-11ed-0f5e-4d5778eb49c4
+# ╠═a84decbd-bb3e-4c6e-825a-8175f8a1323f
 # ╟─eeca97f1-2c0f-4d0a-a153-03896c7ec818
 # ╠═b98d3b17-2ec1-4909-bd6f-69ab7db513ba
-# ╠═f2684b3b-17e0-46d6-bcb7-1b3a44a49638
-# ╠═d3ac42f6-9ef2-4955-aeab-d62d59162769
-# ╠═8c3ae401-35d2-4f0f-aa9d-78d219b4aba2
-# ╠═14c05848-2ae5-4850-b3c8-2661cf087d4d
-# ╠═8c98f86d-2232-4825-898b-a5310b4b0e2f
-# ╠═75ca5b35-f294-4bea-9039-d61243a41161
-# ╠═22937e02-08d6-4a3d-87ad-cb62cf2e56cc
-# ╠═d146b03e-4063-4110-9b27-f5c9333e5bf5
+# ╠═e80ecd4b-04b4-499f-b2f5-c4700a1aa824
 # ╠═2ff6c22a-9af8-4692-b71a-531dd9d4ea7a
+# ╠═4e266c4e-8717-459d-8077-d146787c78c9
 # ╠═a0746796-d7c3-4aac-904e-db4376cb2e2b
-# ╠═d5b541fd-ec86-4181-913d-6afb4d24163f
-# ╠═5227a52f-f58a-49ac-a237-685966bc9b43
+# ╠═dc128551-a0fc-4c9e-8675-05d05255452a
+# ╠═66f794ab-0b4e-4403-a1e0-83e3a6b4cb18
+# ╠═94ccf9c1-5822-4df5-b00f-30a25cc500ca
+# ╠═799ab477-3174-49e0-99a2-e0cd1cda6747
+# ╠═025845a1-6607-497f-b04b-33674a7600de
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

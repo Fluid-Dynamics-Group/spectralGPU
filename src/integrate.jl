@@ -1,11 +1,12 @@
 module Integrate
 
-using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig, AbstractForcing
+using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig, AbstractForcing, AbstractIoExport
 using ..fft: ifftn_mpi!, fftn_mpi!
 using ..mesh: Wavenumbers, WavenumbersGPU
 using ..state: State, StateGPU
 using ..config: Config, calculate_dt
 using ..solver: compute_rhs! 
+import ..Io
 
 using CUDA
 
@@ -16,9 +17,10 @@ function integrate(
     state::State,
     U::Array{Float64, 4}, 
     U_hat::Array{ComplexF64, 4},
-    forcing::FORCING
+    forcing::FORCING,
+    io_exports::Vector{AbstractIoExport},
 ) where P<: AbstractParallel where CFG  <: AbstractConfig where FORCING <: AbstractForcing
-    __integrate(parallel, K, config, state, U, U_hat, forcing)
+    __integrate(parallel, K, config, state, U, U_hat, forcing, io_exports)
 end
 
 function integrate(
@@ -28,9 +30,10 @@ function integrate(
     state::StateGPU,
     U::CuArray{Float64, 4}, 
     U_hat::CuArray{ComplexF64, 4},
-    forcing::FORCING
+    forcing::FORCING,
+    io_exports::Vector{AbstractIoExport},
 ) where P<: AbstractParallel where CFG  <: AbstractConfig where FORCING <: AbstractForcing
-    __integrate(parallel, K, config, state, U, U_hat, forcing)
+    __integrate(parallel, K, config, state, U, U_hat, forcing, io_exports)
 end
 
 function __integrate(
@@ -40,7 +43,8 @@ function __integrate(
     state::STATE,
     U::XARRAY,
     U_hat::FARRAY,
-    forcing::FORCING
+    forcing::FORCING,
+    io_exports::Vector{AbstractIoExport},
 ) where P<: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers where CFG  <: AbstractConfig where FORCING <: AbstractForcing
     t = 0
     tstep = 0
@@ -71,6 +75,16 @@ function __integrate(
         # update U from the rk time integrated U_hat
         @views for i in 1:3
             ifftn_mpi!(parallel, K, state.fft_plan, U_hat[:, :, :, i], U[:, :, :, i])
+        end
+
+        for exporter in io_exports
+            stepper = Io.get_stepper(exporter)
+
+            # if this exporter is intended on 
+            if Io.should_write(stepper, t)
+                Io.export_data(exporter, t)
+                Io.increase_step!(stepper)
+            end
         end
     end
 end
