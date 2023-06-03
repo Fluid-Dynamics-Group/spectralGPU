@@ -21,3 +21,8 @@ pluto:
 
 jupyter:
 	cd jupyter && jupyter notebook
+
+clean-jupyter:
+	nb-clean clean ./jupyter/fft_debug.py.ipynb
+	nb-clean clean ./jupyter/math_check.ipynb
+ 
