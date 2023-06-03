@@ -111,7 +111,7 @@ end
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
-    cfg = config.create_config(N, 40., 0.00001)
+    cfg = config.taylor_green_validation()
     plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
     st = state.create_state_gpu(N, K, cfg, plan)
 
