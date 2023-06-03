@@ -17,4 +17,7 @@ bench:
 	#julia ./benches/cpu_gpu.jl
 
 pluto:
-	cd pluto && julia -e "using Pluto; Pluto.run()"
+	cd pluto && JULIA_CUDA_SOFT_MEMORY_LIMIT="50%" julia -e "using Pluto; Pluto.run()"
+
+jupyter:
+	cd jupyter && jupyter notebook

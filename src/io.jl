@@ -1,6 +1,6 @@
 module Io
 
-export never_write, dt_write, step_number, should_write, increase_step
+export never_write, dt_write, step_number, should_write, increase_step, write_io
 
 using ..markers: AbstractIoStepControl, AbstractIoExport
 using Printf
@@ -92,6 +92,24 @@ end
 
 function export_data(exporter::EXPORT, time::Float64) where EXPORT <: AbstractIoExport
     error(@sprintf "export_data not implemented for stepper `%s` and exporter `%s`. Ensure that you satisfy this interface." typeof(stepper), typeof(exporter))
+end
+
+# iterate through all IO exporters, write IO steppers if the time 
+# stepping is appropriate. This function should be called in the integration stepper 
+# of the solver
+function write_io(
+    t::Float64,
+    io_exports::Vector{AbstractIoExport},
+)
+    for exporter in io_exports
+        stepper = Io.get_stepper(exporter)
+
+        # if this exporter is intended on 
+        if Io.should_write(stepper, t)
+            Io.export_data(exporter, t)
+            Io.increase_step!(stepper)
+        end
+    end
 end
 
 #

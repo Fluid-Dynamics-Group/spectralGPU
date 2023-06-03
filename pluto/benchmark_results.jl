@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.25
+# v0.19.26
 
 using Markdown
 using InteractiveUtils
@@ -152,18 +152,6 @@ begin
 	fig
 end
 
-# ╔═╡ 7efa6d1a-660f-45e2-adec-6fb4e5fc6c49
-const table = (
-	x = [1,1,1,1,2,2,2,2,3,3,3,3],
-	N = [64, 64, 64, 64,128, 128, 128, 128, 256, 256,256, 256],
-	runtime = [
-		(N64_runtimes[2:end] ./ N64_runtimes[1])...,
-		(N128_runtimes[2:end] ./ N128_runtimes[1])...,
-		(N256_runtimes[2:end] ./ N256_runtimes[1])...,
-	],
-	methods = repeat([1,2,3,4],3),
-)
-
 # ╔═╡ 05b476d0-95e2-4a2d-8b3e-1a373ede6ab1
 begin
 	local fig = Figure(resolution = (2*800, 2*600), fontsize=30)
@@ -171,7 +159,7 @@ begin
 
 	local ax = Axis(
 		fig[1,1], 
-		title = "Performance Gains from GPU (higher is better)", 
+		title = "Performance Gains from GPU for a (N x N x N) mesh - higher is better", 
 		xticks = (1:3, ["N=64", "N=128", "N=256"]),
 		# xlabel = "Parallelization",
 		ylabel = "times slower than GPU"
@@ -184,10 +172,10 @@ begin
 		dodge = table.methods,
 		color= colors[table.methods],
 		bar_labels = table.runtime .|> x -> (@sprintf "%0.1fx" x),
-		label_size = 29
+		label_size = 32
 	)
 	
-	labels = xticks[2:end]
+	labels = xticks[3:end]
 	elements = [PolyElement(polycolor = colors[i]) for i in 1:length(labels)]
 	title = "Parallelization"
 	
@@ -196,6 +184,33 @@ begin
 
 	fig
 end
+
+# ╔═╡ 7efa6d1a-660f-45e2-adec-6fb4e5fc6c49
+# ╠═╡ disabled = true
+#=╠═╡
+const table = (
+	x = [1,1,1,1,2,2,2,2,3,3,3,3],
+	N = [64, 64, 64, 64,128, 128, 128, 128, 256, 256,256, 256],
+	runtime = [
+		(N64_runtimes[2:end] ./ N64_runtimes[1])...,
+		(N128_runtimes[2:end] ./ N128_runtimes[1])...,
+		(N256_runtimes[2:end] ./ N256_runtimes[1])...,
+	],
+	methods = repeat([1,2,3,4],3),
+)
+  ╠═╡ =#
+
+# ╔═╡ 7d847755-6da9-4e9b-a8c1-215d7288d609
+const table = (
+	x = [1,1,1,2,2,2,3,3,3],
+	N = [64, 64, 64,128, 128, 128, 256,256, 256],
+	runtime = [
+		(N64_runtimes[3:end] ./ N64_runtimes[1])...,
+		(N128_runtimes[3:end] ./ N128_runtimes[1])...,
+		(N256_runtimes[3:end] ./ N256_runtimes[1])...,
+	],
+	methods = repeat([1,2,3],3),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1516,11 +1531,11 @@ version = "3.5.0+0"
 # ╠═adc743ce-78ea-463f-89df-46110521397e
 # ╠═8b7ad0dc-c7a3-40ef-9d33-8916b803e9a1
 # ╠═363d6cfa-fde6-4a26-970f-4d9e7432a18e
-# ╠═c99e9233-ce0c-4fd5-992b-d01b35143922
 # ╠═2ed19fa0-44e1-4b4c-a5d3-2edb2a96115f
 # ╠═af3255c1-97c5-48f6-a924-ca2e2ba06178
 # ╠═a30b65d8-eaca-4f4d-802d-cbdbd8116f2e
 # ╠═7efa6d1a-660f-45e2-adec-6fb4e5fc6c49
+# ╠═7d847755-6da9-4e9b-a8c1-215d7288d609
 # ╠═05b476d0-95e2-4a2d-8b3e-1a373ede6ab1
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

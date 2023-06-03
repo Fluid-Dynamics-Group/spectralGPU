@@ -44,6 +44,7 @@ function wavenumbers(n::Int)::Wavenumbers
     # div(3,2) = 1, it is integer division
     kn = div(n,2) + 1
     kx_linear = ky_linear[1:kn]
+    kx_linear[end] *= -1
 
     kx, ky, kz = ndgrid(kx_linear, ky_linear, kz_linear)
 

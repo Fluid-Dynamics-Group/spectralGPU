@@ -41,7 +41,9 @@ fftn_mpi!(parallel::P, u, uhat) where P <: AbstractParallel = error("function is
 # single threaded forward FFT implementation for Base arrays
 function fftn_mpi!(parallel::SingleThreadCPU, plan::Plan, u::XARR, uhat::SubArray{ComplexF64, 3}) where XARR <: AbstractArray{Float64, 3}
     # rfft
-    mul!(uhat, plan.forward, u)
+    #mul!(uhat, plan.forward, u)
+
+    uhat[:, :, :] .= rfft(u, 1:3)
 
     nothing
 end
@@ -68,7 +70,7 @@ function ifftn_mpi!(parallel::SingleThreadCPU, wavenumbers::Wavenumbers, plan::P
     # zero allocation multiplication here causes NaNs in solver, unsure why
     # mul!(u, plan.inverse, uhat)
     #
-    #u[:, :, :] .= plan.inverse * uhat
+    # u[:, :, :] .= plan.inverse * uhat
 
     u[:, :, :] = FFTW.irfft(uhat, wavenumbers.n, 1:3)
 
@@ -80,6 +82,7 @@ function ifftn_mpi!(parallel::SingleThreadGPU, wavenumbers::WavenumbersGPU, plan
 )
     # irfft
     mul!(u, plan.inverse, uhat)
+    #u[:, :, :] .= irfft(uhat, K.n, 1:3)
     
     nothing
 end

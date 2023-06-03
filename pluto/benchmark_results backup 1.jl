@@ -1,395 +1,210 @@
 ### A Pluto.jl notebook ###
-# v0.19.26
+# v0.19.25
 
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 697c720a-f9b9-11ed-0f5e-4d5778eb49c4
-begin
-	using CUDA
-	using LazyGrids
-	using FFTW
-end
-
-# ╔═╡ a84decbd-bb3e-4c6e-825a-8175f8a1323f
-using Printf
-
-# ╔═╡ b75a436f-8470-4cfd-bbf3-4e67954707d5
+# ╔═╡ 4c838994-f41a-11ed-15da-a77642accabe
 using CairoMakie
 
-# ╔═╡ eeca97f1-2c0f-4d0a-a153-03896c7ec818
-function ingredients(path::String)
-	# this is from the Julia source code (evalfile in base/loading.jl)
-	# but with the modification that it returns the module instead of the last object
-	name = Symbol(basename(path))
-	m = Module(name)
-	Core.eval(m,
-        Expr(:toplevel,
-             :(eval(x) = $(Expr(:core, :eval))($name, x)),
-             :(include(x) = $(Expr(:top, :include))($name, x)),
-             :(include(mapexpr::Function, x) = $(Expr(:top, :include))(mapexpr, $name, x)),
-             :(include($path))))
-	m
-end
+# ╔═╡ ddfef636-1958-4a49-b3af-c588262d6dd6
+using Printf
 
-# ╔═╡ b98d3b17-2ec1-4909-bd6f-69ab7db513ba
-const solver = ingredients("/home/brooks/github/spectralGPU/src/spectralGPU.jl").spectralGPU
+# ╔═╡ 163900dc-0423-405b-94cd-2a408553424f
+const trials_per_gridsize = 4
 
-# ╔═╡ e80ecd4b-04b4-499f-b2f5-c4700a1aa824
-AbstractParallel = solver.markers.AbstractParallel
+# ╔═╡ 8f6788ff-4165-4ee8-9e22-d02adad3b9f2
+const x = [repeat([1], trials_per_gridsize)..., repeat([2], trials_per_gridsize)..., repeat([3], trials_per_gridsize)...]
 
-# ╔═╡ 2ff6c22a-9af8-4692-b71a-531dd9d4ea7a
-struct EnergyHelicityForcing{STATE <: solver.markers.AbstractState, WAVE <: solver.markers.AbstractWavenumbers, ARR <: AbstractArray{Float64, 4}, FARR <: AbstractArray{ComplexF64, 4}} <: solver.markers.AbstractForcing
-	state::STATE
-	K::WAVE
-	ϵ₁::Float64
-	ϵ₂::Float64
-	f₁::ARR
-	f₂::ARR
-	fᵤ::ARR
-	f̂ᵤ::FARR
-end
+# ╔═╡ 7a01dabc-1dca-4888-b8a1-aecde887353b
+const N = [repeat([64], trials_per_gridsize)..., repeat([128], trials_per_gridsize)..., repeat([256], trials_per_gridsize)...]
 
-# ╔═╡ 4e266c4e-8717-459d-8077-d146787c78c9
-function dot_arr(A::T, B::T) where T <: AbstractArray{Float64, 4}
-	dropdims(sum(A .* B; dims=4); dims = 4)
-end
+# ╔═╡ 1d398e1c-0c01-43d9-a55c-c7b4e0245285
+N64_runtimes = [
+	# gpu
+	33e-3,
+	# CPU 16 ideal
+	1.35 / 16,
+	# cpu 16
+	0.532,
+	# cpu 4
+	0.3934354782104492,
+	# cpu 1
+	1.35
+]
 
-# ╔═╡ a0746796-d7c3-4aac-904e-db4376cb2e2b
-function solver.Forcing.force_system!(
-	parallel::P, 
-	forcing::EnergyHelicityForcing{STATE, WAVE, ARR, FARR},
-	U_hat::FARR, 
-	U::ARR
-)::Union{FARR, Nothing} where ARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4} where STATE <: solver.markers.AbstractState where WAVE <: solver.markers.AbstractWavenumbers where P <: solver.markers.AbstractParallel
-	ω = forcing.state.curl
+# ╔═╡ 2f073374-377a-4e89-ba07-925d6da8e5b4
+N128_runtimes = [
+	# gpu
+	0.281,
+	# CPU 16 ideal
+	16.01 / 16,
+	# cpu 16
+	7.884461,
+	# cpu 4
+	8.10459446,
+	# cpu 1
+	16.01
+]
 
-	solver.solver.curl!(parallel, forcing.K, forcing.state.fft_plan, U_hat; out = ω)
+# ╔═╡ adc743ce-78ea-463f-89df-46110521397e
+N256_runtimes = [
+	# gpu
+	1.914,
+	# CPU 16 ideal
+	313.88 / 16,
+	# cpu 16
+	109.4705486297,
+	# cpu 4
+	117.3228,
+	# cpu 1
+	313.88
+]
 
-	u_dot_ω = dot_arr(ω, U)
-	u_dot_u = dot_arr(U, U)
-	ω_dot_ω = dot_arr(ω, ω)
+# ╔═╡ 8b7ad0dc-c7a3-40ef-9d33-8916b803e9a1
+const runtime = [N64_runtimes..., N128_runtimes...,N256_runtimes...]
 
-	forcing.f₁[:, :, :, :] .= (u_dot_ω .* ω) .- (ω_dot_ω .* U)
-	forcing.f₂[:, :, :, :] .= (u_dot_ω .* U) .- (u_dot_u .* ω)
-	forcing.fᵤ[:, :, :, :] .= forcing.ϵ₁ .* forcing.f₁ .+ forcing.ϵ₂ .* forcing.f₂
+# ╔═╡ 363d6cfa-fde6-4a26-970f-4d9e7432a18e
+const methods = repeat([1,2,3,4],3)
 
-	# forward transform to fourier space
-	@views for i in 1:3
-		solver.fft.fftn_mpi!(parallel, forcing.state.fft_plan, forcing.fᵤ[:, :, :, i], forcing.f̂ᵤ[:, :, :, i])
-	end
+# ╔═╡ 2ed19fa0-44e1-4b4c-a5d3-2edb2a96115f
+const xticks = ["GPU", "(CPU 1)/16", "CPU 16", "CPU 4", "CPU 1"]
 
-	# println(sum(abs.(forcing.fᵤ)))
-	# println(sum(abs.(forcing.f̂ᵤ)))
-	forcing.f̂ᵤ
-end
-
-# ╔═╡ dc128551-a0fc-4c9e-8675-05d05255452a
-function run_solver(N)#::Array{Float64, 4}
-	RE::Float64 = 256.;
-	parallel = solver.markers.SingleThreadGPU();
-	local K = solver.mesh.wavenumbers_gpu(N)
-	ic = solver.markers.TaylorGreen()
-
-	runtime = 1.1
-	# config = solver.config.create_config(N, RE, runtkime)
-	config = solver.config.taylor_green_validation()
-	mesh = solver.mesh.new_mesh(N)
-	
-	U = CuArray(zeros(N, N, N, 3));
-	U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)));
-	plan = solver.fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
-	solver.initial_condition.setup_initial_condition(parallel, ic, mesh, U, U_hat, plan)
-
-	state = solver.state.create_state_gpu(N, K, config, plan)
-
-	# for δ = 0.1
-	ϵ₁ = 0.
-	ϵ₂ = -1.0
-	# ϵ₂ = 1.
-	f₁ = CuArray(zeros(N, N, N, 3))
-	f₂ = CuArray(zeros(N, N, N, 3))
-	fᵤ = CuArray(zeros(N, N, N, 3))
-	f̂ᵤ = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
-	
-	# forcing = EnergyHelicityForcing(state, K, ϵ₁, ϵ₂, f₁, f₂, fᵤ, f̂ᵤ)
-	forcing = solver.Forcing.Unforced();
-	
-	energy_export = solver.Exporters.EnergyExport(
-		N,
-		solver.Io.dt_write(0.01),
-		Vector{Float64}(),
-		U
-	)
-	helicity_export = solver.Exporters.HelicityExport(
-		N,
-		parallel,
-		K,
-		plan,
-		solver.Io.dt_write(0.01),
-		Vector{Float64}(),
-		U_hat,
-		U,
-		state.curl
-	)
-	exports::Vector{solver.markers.AbstractIoExport} = [
-		energy_export,
-		helicity_export
-	]
-	
-	solver.Integrate.integrate(parallel, K, config, state, U, U_hat, forcing, exports);
-
-	u_cpu = Array(U)
-
-	CUDA.unsafe_free!(U)
-	CUDA.unsafe_free!(U_hat)
-	CUDA.unsafe_free!(state.dU)
-	CUDA.unsafe_free!(state.U_hat₁)
-	CUDA.unsafe_free!(state.U_hat₀)
-	CUDA.unsafe_free!(state.curl)
-	CUDA.unsafe_free!(state.dealias)
-	CUDA.unsafe_free!(state.P_hat)
-	CUDA.unsafe_free!(state.K²)
-	CUDA.unsafe_free!(state.K_over_K²)
-	CUDA.unsafe_free!(state.wavenumber_product_tmp)
-	CUDA.unsafe_free!(state.ν)
-
-	energy_export.history, helicity_export.history
-end
-
-# ╔═╡ 66f794ab-0b4e-4403-a1e0-83e3a6b4cb18
-# @time run_solver(128)
-
-# ╔═╡ f3a51590-6714-4952-8702-e6546ab68db4
-# run_solver(128)
-
-# ╔═╡ c2e852b4-d157-4db5-9158-7471709564b1
-1328488.931
-
-# ╔═╡ d33ec2f2-1e6b-4f98-8ccb-c86c0ae40245
-1.2629529314194748e6
-
-# ╔═╡ 94ccf9c1-5822-4df5-b00f-30a25cc500ca
-@time d = run_solver(64); d
-
-# ╔═╡ b93466cd-818a-466c-a22b-3794c1a60eb4
-d[1][9+1]
-
-# ╔═╡ 025845a1-6607-497f-b04b-33674a7600de
-# @time run_solver(256)
-
-# ╔═╡ a5ff544c-fe7a-4a05-a0d8-4cdac964a673
-complex(0, 1)
-
-# ╔═╡ 46abcfad-161d-4e07-a042-7d713443b586
-@views function __curl!(
-    parallel::P, 
-    K, 
-    plan,
-    input::FARRAY
-    ;
-    out::XARRAY
-) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4}
-    j::ComplexF64 = complex(0., 1.)
-
-    solver.fft.ifftn_mpi!(
-		parallel, K, plan, 
-		j.*(Array(K[2]).*input[:, :, :, 3] .- Array(K[3]).*input[:, :, :, 2]), out[:, :, :, 1]
-	)
-    solver.fft.ifftn_mpi!(
-		parallel, K, plan, 
-		j.*(Array(K[3]).*input[:, :, :, 1] .- Array(K[1]).*input[:, :, :, 3]), out[:, :, :, 2]
-	)
-    solver.fft.ifftn_mpi!(parallel, K, plan, 
-		j.*(Array(K[1]).*input[:, :, :, 2] .- Array(K[2]).*input[:, :, :, 1]), out[:, :, :, 3]
-	)
-
-    nothing
-end
-
-# ╔═╡ 823795bc-4e98-4b8d-a2eb-436881ef36ed
+# ╔═╡ af3255c1-97c5-48f6-a924-ca2e2ba06178
 begin
-	N = 128
-	local parallel = solver.markers.SingleThreadCPU()
-	K = solver.mesh.wavenumbers(N)
+	local fig = Figure(resolution = (900, 600))
 
-	U = (zeros(N, N, N, 3));
-	cross = (zeros(N, N, N, 3));
-	U_deriv = (zeros(N, N, N, 3));
-	U_hat = (ComplexF64.(zeros(K.kn, N, N, 3)));
-	plan = solver.fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+	local makeax(row, col, N) = Axis(
+		fig[row,col], 
+		title = "N = $N", 
+		xticks = (1:5, xticks),
+		# xlabel = "Parallelization",
+		ylabel = "runtime [s]"
+	)
+	local ax64 = makeax(1,1,64)
+	local ax128 = makeax(1,2,128)
+	local ax256= makeax(2,1,256)
+
+	colsize!(fig.layout, 1, Relative(1/2))
+	colsize!(fig.layout, 2, Relative(1/2))
+
 	
-	# config = solver.config.create_config(N, 40., 15.)
-	config = solver.config.taylor_green_validation()
-	state = solver.state.create_state(N, K, config, plan)
+	barplot!(
+		ax64,
+		1:5,
+		N64_runtimes,
+	)
+	barplot!(
+		ax128,
+		1:5,
+		N128_runtimes,
+	)
+	barplot!(
+		ax256,
+		1:5,
+		N256_runtimes,
+	)
 
-	mesh = solver.mesh.new_mesh(N)
-	ic = solver.markers.TaylorGreen()
-	solver.initial_condition.setup_initial_condition(parallel, ic, mesh, U, U_hat, plan)
-
-	U_deriv[:, :, :, 1] .= -cos.(mesh.x).*sin.(mesh.y).*sin.(mesh.z)
-	U_deriv[:, :, :, 2] .= -cos.(mesh.y).*sin.(mesh.x).*sin.(mesh.z)
-	U_deriv[:, :, :, 3] .= 2*cos.(mesh.z).*sin.(mesh.x).*sin.(mesh.y)
+	# labels = xticks
+	# elements = [PolyElement(polycolor = colors[i]) for i in 1:length(labels)]
+	# title = "Configuration"
 	
-	# first, take the curl of the data
-	solver.solver.curl!(parallel, K, state.fft_plan, U_hat; out = state.curl)
-
-
-	# calculate the cross product
-	solver.solver.cross!(parallel, state.fft_plan, U, state.curl; out = state.dU)
-
-	@views for i in 1:3
-		solver.fft.ifftn_mpi!(
-			parallel, K, plan, 
-			state.dU[:, :, :, i], cross[:, :, :, i]
-		)
-	end
+	# Legend(fig[2,2], elements, labels, title)
+	
+	fig
 end
 
-# ╔═╡ 1d976523-95c4-4ee9-b2ca-fc68c0fcc47d
-	# @views for i in 1:3
- #        solver.fft.fftn_mpi!(parallel, plan, U[:, :, :, i], U_hat[:, :, :, i])
-	# 	U_hat[:, :, :, i] .*= K[3] * complex(0, 1)
-	# 	solver.fft.ifftn_mpi!(parallel, K, plan, U_hat[:, :, :, i], U_deriv[:, :, :, i])
- #    end
-
-
-	# solver.solver.cross!(parallel, state.fft_plan, U, state.curl; out = state.dU)
-
-	# then, compute the cross products
-
-
-	# f₁ = (zeros(N, N, N, 3))
-	# f₂ = (zeros(N, N, N, 3))
-	# fᵤ = (zeros(N, N, N, 3))
-	# f̂ᵤ = (ComplexF64.(zeros(K.kn, N, N, 3)))
-
-	# # ϵ₁ = 1.
-	# # ϵ₂ = 1.	
-	# ϵ₁ = 0.
-	# ϵ₂ = -2056376780.81
-	# forcing = EnergyHelicityForcing(state, K, ϵ₁, ϵ₂, f₁, f₂, fᵤ, f̂ᵤ)
-
-	# solver.Forcing.force_system!(parallel, forcing, U_hat, U)
-	
-	# println(sum(abs.(U)))
-	# println("")
-
-	
-	# println(sum(abs.(forcing.f₁)))
-	# println(sum(abs.(forcing.f₂)))
-	# println(sum(abs.(forcing.fᵤ)))
-
-# ╔═╡ f5d6672d-fbc3-45ae-b053-d400bef7ff61
-K.kx[:, 1, 1]
-
-# ╔═╡ 52744d0b-0491-4fcd-8f57-bf7d1d8d2852
-K.ky[1, :, 1]
-
-# ╔═╡ 5438f45c-90ce-4d6a-8d6b-b5a8f05a5c93
-K.kz[1, 1, :]
-
-# ╔═╡ c97b162c-ec5c-4739-9bf7-289fe0b6f58c
-[sum(abs.(state.curl[:, :, :, i])) for i in 1:3]
-
-# ╔═╡ b5eda0ba-8eb7-4b99-821a-5463e1a20a02
-const zidx = 32
-
-# ╔═╡ 88b5a2b9-1985-4ad9-9216-141b8c2c8aac
-function _contour(alldata::Array{Float64, 4}, slice)
-	fig = Figure(resolution=(1200,500))
-
-	for i = 1:3
-		data = alldata[slice...,i]
-		ax = Axis(fig[1,i])
-		c = contourf!(ax, data)
-		if sum(abs.(data)) != 0
-			try
-				Colorbar(fig[2,i], c, vertical=false)
-			catch e
-			end
-		end
-	end
-	
-	return fig
-end
-
-# ╔═╡ 805af7a7-3fa1-43a1-bb0a-78cd398d35e4
-function _line3(alldata::Array{Float64, 4})
-	fig = Figure(resolution=(1200,500))
-	I = Int(floor(N/2))
-	slices = [
-		[:, I, I, 1],
-		[I, :, I, 2],
-		[I, I, :, 3]
-	]
-
-	for (i,slice) = zip(1:3, slices)
-		data = alldata[slice...]
-		ax = Axis(fig[1,i])
-		plot!(ax, 1:N, data)
-	end
-	
-	return fig
-end
-
-# ╔═╡ 18ab3588-33db-4142-a325-c6f329dc3721
-_line3(U)
-
-# ╔═╡ 895e87fc-6801-4cb0-98ad-8a8481196cb1
-_line3(state.curl)
-
-# ╔═╡ 429339cc-a1bc-4350-85f1-03a46b76af4b
-curl_validation = [:, :, 64]
-
-# ╔═╡ 0c2f75fe-89ba-44d1-bef5-613768279569
-_contour(state.curl, curl_validation)
-
-# ╔═╡ 0341b920-df60-4997-984b-a74f6e4b9ab5
-_contour(U_deriv, curl_validation)
-
-# ╔═╡ 68ec6fc9-ead9-43bf-8de8-bfb1cb13916b
-_contour(cross, curl_validation)
-
-# ╔═╡ 5a45fdf9-67c3-42c9-8acc-f630f1cdd5f5
-_contour(U, curl_validation)
-
-# ╔═╡ b887166b-5e83-44c2-b3d1-2296ae44065e
-# _contour(real.(U_hat), curl_validation)
-
-# ╔═╡ e5c2b994-bee0-43db-aa08-1488e927684b
-# _contour(imag.(U_hat), curl_validation)
-
-# ╔═╡ a829c124-668d-4ccf-a453-ce6d1169ce4a
+# ╔═╡ a30b65d8-eaca-4f4d-802d-cbdbd8116f2e
 begin
-	local fig = Figure()
-	local ax = Axis(fig[1,1])
-	plot!(ax, 1:N, state.curl[1, :, 64, 1], label = "curl x")
-	plot!(ax, 1:N, U_deriv[1, :, 64, 1], label = "expected x", color = :red, marker = :+)
-	axislegend()
+	local fig = Figure(resolution = (800, 600))
 
-	local ax2 = Axis(fig[1,2])
-	plot!(ax2, 1:N, state.curl[:, 1, 64, 2], label = "curl x")
-	plot!(ax2, 1:N, U_deriv[:, 1, 64, 2], label = "expected x", color = :red, marker = :+)
+	local makeax_com(row, col, N) = Axis(
+		fig[row,col], 
+		title = "N = $N", 
+		xticks = (1:4, xticks[2:end]),
+		# xlabel = "Parallelization",
+		ylabel = "times slower than GPU"
+	)
+	local ax64 = makeax_com(1,1,64)
+	local ax128 = makeax_com(1,2,128)
+	local ax256= makeax_com(2,1,256)
 
-	axislegend()
+	colsize!(fig.layout, 1, Relative(1/2))
+	colsize!(fig.layout, 2, Relative(1/2))
+
+	
+	barplot!(
+		ax64,
+		1:4,
+		N64_runtimes[2:end] ./ N64_runtimes[1],
+	)
+	barplot!(
+		ax128,
+		1:4,
+		N128_runtimes[2:end] ./ N128_runtimes[1],
+	)
+	barplot!(
+		ax256,
+		1:4,
+		N256_runtimes[2:end] ./ N256_runtimes[1],
+	)
+
+	fig
+end
+
+# ╔═╡ 7efa6d1a-660f-45e2-adec-6fb4e5fc6c49
+const table = (
+	x = [1,1,1,1,2,2,2,2,3,3,3,3],
+	N = [64, 64, 64, 64,128, 128, 128, 128, 256, 256,256, 256],
+	runtime = [
+		(N64_runtimes[2:end] ./ N64_runtimes[1])...,
+		(N128_runtimes[2:end] ./ N128_runtimes[1])...,
+		(N256_runtimes[2:end] ./ N256_runtimes[1])...,
+	],
+	methods = repeat([1,2,3,4],3),
+)
+
+# ╔═╡ 05b476d0-95e2-4a2d-8b3e-1a373ede6ab1
+begin
+	local fig = Figure(resolution = (2*800, 2*600), fontsize=30)
+	local colors = Makie.wong_colors()
+
+	local ax = Axis(
+		fig[1,1], 
+		title = "Performance Gains from GPU (higher is better)", 
+		xticks = (1:3, ["N=64", "N=128", "N=256"]),
+		# xlabel = "Parallelization",
+		ylabel = "times slower than GPU"
+	)
+	
+	barplot!(
+		ax,
+		table.x,
+		table.runtime,
+		dodge = table.methods,
+		color= colors[table.methods],
+		bar_labels = table.runtime .|> x -> (@sprintf "%0.1fx" x),
+		label_size = 29
+	)
+	
+	labels = xticks[2:end]
+	elements = [PolyElement(polycolor = colors[i]) for i in 1:length(labels)]
+	title = "Parallelization"
+	
+	Legend(fig[1,2], elements, labels, title)
+
+
 	fig
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
-LazyGrids = "7031d0ef-c40d-4431-b2f8-61a8d2f650db"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
-CUDA = "~4.2.0"
 CairoMakie = "~0.10.5"
-FFTW = "~1.6.0"
-LazyGrids = "~0.5.0"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -398,7 +213,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.0"
 manifest_format = "2.0"
-project_hash = "e09802cb4d479be5305b78c9cebdb220ae0a0052"
+project_hash = "e5e9220f8f55aa959db3f0207fb5de364a186705"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -438,12 +253,6 @@ version = "1.1.1"
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 
-[[deps.Atomix]]
-deps = ["UnsafeAtomics"]
-git-tree-sha1 = "c06a868224ecba914baa6942988e2f2aade419be"
-uuid = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
-version = "0.1.0"
-
 [[deps.Automa]]
 deps = ["Printf", "ScanByte", "TranscodingStreams"]
 git-tree-sha1 = "d50976f217489ce799e366d9561d56a98a30d7fe"
@@ -462,12 +271,6 @@ git-tree-sha1 = "1dd4d9f5beebac0c03446918741b1a03dc5e5788"
 uuid = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
 version = "0.4.6"
 
-[[deps.BFloat16s]]
-deps = ["LinearAlgebra", "Printf", "Random", "Test"]
-git-tree-sha1 = "dbf84058d0a8cbbadee18d25cf606934b22d7c66"
-uuid = "ab4f0b2a-ad5b-11e8-123f-65d77653426b"
-version = "0.4.2"
-
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 
@@ -484,30 +287,6 @@ version = "0.4.2"
 
 [[deps.CRC32c]]
 uuid = "8bf52ea8-c179-5cab-976a-9e18b702a9bc"
-
-[[deps.CUDA]]
-deps = ["AbstractFFTs", "Adapt", "BFloat16s", "CEnum", "CUDA_Driver_jll", "CUDA_Runtime_Discovery", "CUDA_Runtime_jll", "CompilerSupportLibraries_jll", "ExprTools", "GPUArrays", "GPUCompiler", "KernelAbstractions", "LLVM", "LazyArtifacts", "Libdl", "LinearAlgebra", "Logging", "Preferences", "Printf", "Random", "Random123", "RandomNumbers", "Reexport", "Requires", "SparseArrays", "SpecialFunctions", "UnsafeAtomicsLLVM"]
-git-tree-sha1 = "280893f920654ebfaaaa1999fbd975689051f890"
-uuid = "052768ef-5323-5732-b1bb-66c8b64840ba"
-version = "4.2.0"
-
-[[deps.CUDA_Driver_jll]]
-deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
-git-tree-sha1 = "498f45593f6ddc0adff64a9310bb6710e851781b"
-uuid = "4ee394cb-3365-5eb0-8335-949819d2adfc"
-version = "0.5.0+1"
-
-[[deps.CUDA_Runtime_Discovery]]
-deps = ["Libdl"]
-git-tree-sha1 = "bcc4a23cbbd99c8535a5318455dcf0f2546ec536"
-uuid = "1af6417a-86b4-443c-805f-a4643ffb695f"
-version = "0.2.2"
-
-[[deps.CUDA_Runtime_jll]]
-deps = ["Artifacts", "CUDA_Driver_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
-git-tree-sha1 = "5248d9c45712e51e27ba9b30eebec65658c6ce29"
-uuid = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
-version = "0.6.0+0"
 
 [[deps.Cairo]]
 deps = ["Cairo_jll", "Colors", "Glib_jll", "Graphics", "Libdl", "Pango_jll"]
@@ -626,9 +405,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[deps.Distributions]]
 deps = ["FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "Test"]
-git-tree-sha1 = "aa8ae1e8e8d4b5ef38a8fbc028fc75f3c5cad73d"
+git-tree-sha1 = "4f59fe4eb1308011bd33b390369cbad74e46eea4"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.25.94"
+version = "0.25.92"
 
     [deps.Distributions.extensions]
     DistributionsChainRulesCoreExt = "ChainRulesCore"
@@ -666,11 +445,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "bad72f730e9e91c08d9427d5e8db95478a3c323d"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.4.8+0"
-
-[[deps.ExprTools]]
-git-tree-sha1 = "c1d06d129da9f55715c6c212866f5b1bddc5fa00"
-uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
-version = "0.1.9"
 
 [[deps.Extents]]
 git-tree-sha1 = "5e1e4c53fa39afe63a7d356e30452249365fba99"
@@ -712,9 +486,9 @@ uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
 [[deps.FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
-git-tree-sha1 = "fa10570aee20250d446c9951b459c63529b1107c"
+git-tree-sha1 = "fc86b4fd3eff76c3ce4f5e96e2fdfa6282722885"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "1.0.2"
+version = "1.0.0"
 
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
@@ -762,23 +536,11 @@ version = "1.0.10+0"
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
-[[deps.GPUArrays]]
-deps = ["Adapt", "GPUArraysCore", "LLVM", "LinearAlgebra", "Printf", "Random", "Reexport", "Serialization", "Statistics"]
-git-tree-sha1 = "9ade6983c3dbbd492cf5729f865fe030d1541463"
-uuid = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
-version = "8.6.6"
-
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
 git-tree-sha1 = "1cd7f0af1aa58abc02ea1d872953a97359cb87fa"
 uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
 version = "0.1.4"
-
-[[deps.GPUCompiler]]
-deps = ["ExprTools", "InteractiveUtils", "LLVM", "Libdl", "Logging", "Scratch", "TimerOutputs", "UUIDs"]
-git-tree-sha1 = "5737dc242dadd392d934ee330c69ceff47f0259c"
-uuid = "61eb1bfa-7361-4325-ad38-22787b887f55"
-version = "0.19.4"
 
 [[deps.GeoInterface]]
 deps = ["Extents"]
@@ -952,12 +714,6 @@ git-tree-sha1 = "6f2675ef130a300a112286de91973805fcc5ffbc"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "2.1.91+0"
 
-[[deps.KernelAbstractions]]
-deps = ["Adapt", "Atomix", "InteractiveUtils", "LinearAlgebra", "MacroTools", "PrecompileTools", "SparseArrays", "StaticArrays", "UUIDs", "UnsafeAtomics", "UnsafeAtomicsLLVM"]
-git-tree-sha1 = "47be64f040a7ece575c2b5f53ca6da7b548d69f4"
-uuid = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
-version = "0.9.4"
-
 [[deps.KernelDensity]]
 deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
 git-tree-sha1 = "90442c50e202a5cdf21a7899c66b240fdef14035"
@@ -969,18 +725,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "f6250b16881adf048549549fba48b1161acdac8c"
 uuid = "c1c5ebd0-6772-5130-a774-d5fcae4a789d"
 version = "3.100.1+0"
-
-[[deps.LLVM]]
-deps = ["CEnum", "LLVMExtra_jll", "Libdl", "Printf", "Unicode"]
-git-tree-sha1 = "26a31cdd9f1f4ea74f649a7bf249703c687a953d"
-uuid = "929cbde3-209d-540e-8aea-75f648917ca0"
-version = "5.1.0"
-
-[[deps.LLVMExtra_jll]]
-deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
-git-tree-sha1 = "09b7505cc0b1cee87e5d4a26eea61d2e1b0dcd35"
-uuid = "dad2f222-ce93-54a1-a47d-0025e8a3acab"
-version = "0.0.21+0"
 
 [[deps.LZO_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -996,12 +740,6 @@ version = "1.3.0"
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
 uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
-
-[[deps.LazyGrids]]
-deps = ["Statistics"]
-git-tree-sha1 = "f43d10fea7e448a60e92976bbd8bfbca7a6e5d09"
-uuid = "7031d0ef-c40d-4431-b2f8-61a8d2f650db"
-version = "0.5.0"
 
 [[deps.LazyModules]]
 git-tree-sha1 = "a560dd966b386ac9ae60bdd3a3d3a326062d3c3e"
@@ -1364,18 +1102,6 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 deps = ["SHA", "Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
-[[deps.Random123]]
-deps = ["Random", "RandomNumbers"]
-git-tree-sha1 = "552f30e847641591ba3f39fd1bed559b9deb0ef3"
-uuid = "74087812-796a-5b5d-8853-05524746bad3"
-version = "1.6.1"
-
-[[deps.RandomNumbers]]
-deps = ["Random", "Requires"]
-git-tree-sha1 = "043da614cc7e95c703498a491e2c21f58a2b8111"
-uuid = "e6cf234a-135c-5ec9-84dd-332b85af5143"
-version = "1.5.3"
-
 [[deps.RangeArrays]]
 git-tree-sha1 = "b9039e93773ddcfc828f12aadf7115b4b4d225f5"
 uuid = "b3c3ace0-ae52-54e7-9d0b-2c1406fd6b9d"
@@ -1609,12 +1335,6 @@ git-tree-sha1 = "8621f5c499a8aa4aa970b1ae381aae0ef1576966"
 uuid = "731e570b-9d59-4bfa-96dc-6df516fadf69"
 version = "0.6.4"
 
-[[deps.TimerOutputs]]
-deps = ["ExprTools", "Printf"]
-git-tree-sha1 = "f548a9e9c490030e545f72074a41edfd0e5bcdd7"
-uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
-version = "0.5.23"
-
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]
 git-tree-sha1 = "9a6ae7ed916312b41236fcef7e0af564ef934769"
@@ -1643,17 +1363,6 @@ deps = ["REPL"]
 git-tree-sha1 = "53915e50200959667e78a92a418594b428dffddf"
 uuid = "1cfade01-22cf-5700-b092-accc4b62d6e1"
 version = "0.4.1"
-
-[[deps.UnsafeAtomics]]
-git-tree-sha1 = "6331ac3440856ea1988316b46045303bef658278"
-uuid = "013be700-e6cd-48c3-b4a1-df204f14c38f"
-version = "0.2.1"
-
-[[deps.UnsafeAtomicsLLVM]]
-deps = ["LLVM", "UnsafeAtomics"]
-git-tree-sha1 = "ea37e6066bf194ab78f4e747f5245261f17a7175"
-uuid = "d80eeb9a-aca5-4d75-85e5-170c8b632249"
-version = "0.1.2"
 
 [[deps.WoodburyMatrices]]
 deps = ["LinearAlgebra", "SparseArrays"]
@@ -1797,43 +1506,21 @@ version = "3.5.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═697c720a-f9b9-11ed-0f5e-4d5778eb49c4
-# ╠═a84decbd-bb3e-4c6e-825a-8175f8a1323f
-# ╠═b75a436f-8470-4cfd-bbf3-4e67954707d5
-# ╟─eeca97f1-2c0f-4d0a-a153-03896c7ec818
-# ╠═b98d3b17-2ec1-4909-bd6f-69ab7db513ba
-# ╠═e80ecd4b-04b4-499f-b2f5-c4700a1aa824
-# ╠═2ff6c22a-9af8-4692-b71a-531dd9d4ea7a
-# ╠═4e266c4e-8717-459d-8077-d146787c78c9
-# ╠═a0746796-d7c3-4aac-904e-db4376cb2e2b
-# ╠═dc128551-a0fc-4c9e-8675-05d05255452a
-# ╠═66f794ab-0b4e-4403-a1e0-83e3a6b4cb18
-# ╠═f3a51590-6714-4952-8702-e6546ab68db4
-# ╠═c2e852b4-d157-4db5-9158-7471709564b1
-# ╠═d33ec2f2-1e6b-4f98-8ccb-c86c0ae40245
-# ╠═b93466cd-818a-466c-a22b-3794c1a60eb4
-# ╠═94ccf9c1-5822-4df5-b00f-30a25cc500ca
-# ╠═025845a1-6607-497f-b04b-33674a7600de
-# ╠═a5ff544c-fe7a-4a05-a0d8-4cdac964a673
-# ╠═46abcfad-161d-4e07-a042-7d713443b586
-# ╠═823795bc-4e98-4b8d-a2eb-436881ef36ed
-# ╟─1d976523-95c4-4ee9-b2ca-fc68c0fcc47d
-# ╠═f5d6672d-fbc3-45ae-b053-d400bef7ff61
-# ╠═52744d0b-0491-4fcd-8f57-bf7d1d8d2852
-# ╠═5438f45c-90ce-4d6a-8d6b-b5a8f05a5c93
-# ╠═c97b162c-ec5c-4739-9bf7-289fe0b6f58c
-# ╠═b5eda0ba-8eb7-4b99-821a-5463e1a20a02
-# ╠═88b5a2b9-1985-4ad9-9216-141b8c2c8aac
-# ╠═805af7a7-3fa1-43a1-bb0a-78cd398d35e4
-# ╠═18ab3588-33db-4142-a325-c6f329dc3721
-# ╠═895e87fc-6801-4cb0-98ad-8a8481196cb1
-# ╠═429339cc-a1bc-4350-85f1-03a46b76af4b
-# ╠═0c2f75fe-89ba-44d1-bef5-613768279569
-# ╠═0341b920-df60-4997-984b-a74f6e4b9ab5
-# ╠═68ec6fc9-ead9-43bf-8de8-bfb1cb13916b
-# ╠═5a45fdf9-67c3-42c9-8acc-f630f1cdd5f5
-# ╠═b887166b-5e83-44c2-b3d1-2296ae44065e
-# ╠═e5c2b994-bee0-43db-aa08-1488e927684b
-# ╠═a829c124-668d-4ccf-a453-ce6d1169ce4a
+# ╠═4c838994-f41a-11ed-15da-a77642accabe
+# ╠═ddfef636-1958-4a49-b3af-c588262d6dd6
+# ╠═163900dc-0423-405b-94cd-2a408553424f
+# ╠═8f6788ff-4165-4ee8-9e22-d02adad3b9f2
+# ╠═7a01dabc-1dca-4888-b8a1-aecde887353b
+# ╠═1d398e1c-0c01-43d9-a55c-c7b4e0245285
+# ╠═2f073374-377a-4e89-ba07-925d6da8e5b4
+# ╠═adc743ce-78ea-463f-89df-46110521397e
+# ╠═8b7ad0dc-c7a3-40ef-9d33-8916b803e9a1
+# ╠═363d6cfa-fde6-4a26-970f-4d9e7432a18e
+# ╠═c99e9233-ce0c-4fd5-992b-d01b35143922
+# ╠═2ed19fa0-44e1-4b4c-a5d3-2edb2a96115f
+# ╠═af3255c1-97c5-48f6-a924-ca2e2ba06178
+# ╠═a30b65d8-eaca-4f4d-802d-cbdbd8116f2e
+# ╠═7efa6d1a-660f-45e2-adec-6fb4e5fc6c49
+# ╠═05b476d0-95e2-4a2d-8b3e-1a373ede6ab1
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

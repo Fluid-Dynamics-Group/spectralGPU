@@ -146,6 +146,122 @@ end
         true
     end
 
+    ########
+    ######## Now, begin numerical validation of curl / cross / RHS
+    ########
+
+    initial_condition.setup_initial_condition(parallel, initial_condition.TaylorGreen(), msh, U, U_hat, plan)
+
+    @test begin
+        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
+
+        result = Int(floor(sum(abs.(st.curl))))
+        t1_result = Int(floor(sum(abs.(st.curl[:, :, :, 1]))))
+        t2_result = Int(floor(sum(abs.(st.curl[:, :, :, 2]))))
+        t3_result = Int(floor(sum(abs.(st.curl[:, :, :, 3]))))
+
+        total_magnitude = 269893 
+        term_1 = 67473
+        term_2 = 67473
+        term_3 = 134946
+        match = (result == total_magnitude) &&
+            (t1_result == term_1) &&
+            (t2_result == term_2) &&
+            (t3_result == term_3)
+
+        if !match
+            println("failed match curl")
+            println("magnitude was $result - goal: $total_magnitude")
+
+            println("term 1 was $t1_result - goal $term_1")
+            println("term 2 was $t2_result - goal $term_2")
+            println("term 3 was $t3_result - goal $term_3")
+        end
+
+        match
+    end
+
+    @test begin
+        cross = CuArray(zeros(N, N, N, 3))
+        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
+
+        # inverse FFT the data to X space for comparissons
+        @views for i in 1:3
+            fft.ifftn_mpi!(
+                parallel, K, plan, 
+                st.dU[:, :, :, i], cross[:, :, :, i]
+            )
+        end
+        result = Int(floor(sum(abs.(cross))))
+        t1_result = Int(floor(sum(abs.(cross[:, :, :, 1]))))
+        t2_result = Int(floor(sum(abs.(cross[:, :, :, 2]))))
+        t3_result = Int(floor(sum(abs.(cross[:, :, :, 3]))))
+
+        total_magnitude = 124762
+        all_terms = 41587
+        match = (result == total_magnitude) &&
+            (t1_result == all_terms) &&
+            (t2_result == all_terms) &&
+            (t3_result == all_terms)
+
+        if !match
+            println("failed match cross")
+            println("magnitude was $result - goal: $total_magnitude")
+
+            println("term 1 was $t1_result - goal $all_terms div: $(t1_result/all_terms)")
+            println("term 2 was $t2_result - goal $all_terms div: $(t2_result/all_terms)")
+            println("term 3 was $t3_result - goal $all_terms div: $(t3_result/all_terms)")
+        end
+
+        match
+    end
+
+    # main solver call
+    @test begin
+        dU_real = CuArray(zeros(N, N, N, 3))
+        solver.compute_rhs!(
+            1,
+            parallel,
+            K,
+            U,
+            U_hat,
+            st,
+            forcing
+        )
+
+        # inverse FFT the data to X space for comparissons
+        @views for i in 1:3
+            fft.ifftn_mpi!(
+                parallel, K, plan, 
+                st.dU[:, :, :, i], dU_real[:, :, :, i]
+            )
+        end
+        result = Int(floor(sum(abs.(dU_real))))
+        t1_result = Int(floor(sum(abs.(dU_real[:, :, :, 1]))))
+        t2_result = Int(floor(sum(abs.(dU_real[:, :, :, 2]))))
+        t3_result = Int(floor(sum(abs.(dU_real[:, :, :, 3]))))
+
+        total_magnitude = 43247
+        t1_t2 = 13209
+        t3 = 16827
+
+        match = (result == total_magnitude) &&
+            (t1_result == t1_t2) &&
+            (t2_result == t1_t2) &&
+            (t3_result == t3)
+
+        if !match
+            println("failed match compute RHS")
+            println("magnitude was $result - goal: $total_magnitude")
+
+            println("term 1 was $t1_result - goal $t1_t2 div: $(t1_result/t1_t2)")
+            println("term 2 was $t2_result - goal $t1_t2 div: $(t2_result/t1_t2)")
+            println("term 3 was $t3_result - goal $t3 div: $(t3_result/t3)")
+        end
+
+        match
+    end
+
 end
 
 @testset "integrate.jl - checked" begin

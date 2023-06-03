@@ -46,10 +46,14 @@ function __integrate(
     forcing::FORCING,
     io_exports::Vector{AbstractIoExport},
 ) where P<: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where STATE <: AbstractState where WAVE <: AbstractWavenumbers where CFG  <: AbstractConfig where FORCING <: AbstractForcing
-    t = 0
-    tstep = 0
+    t::Float64 = 0.
+    tstep::Int = 0
 
     dt = calculate_dt(U, config)
+
+    #println("dt is " * string(dt))
+    
+    Io.write_io(t, io_exports);
 
     while t < config.time - 1e-8
         t += dt
@@ -77,18 +81,9 @@ function __integrate(
             ifftn_mpi!(parallel, K, state.fft_plan, U_hat[:, :, :, i], U[:, :, :, i])
         end
 
-        for exporter in io_exports
-            stepper = Io.get_stepper(exporter)
-
-            # if this exporter is intended on 
-            if Io.should_write(stepper, t)
-                Io.export_data(exporter, t)
-                Io.increase_step!(stepper)
-            end
-        end
+        Io.write_io(t, io_exports);
     end
 end
-
 
 #
 end

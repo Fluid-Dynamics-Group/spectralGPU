@@ -7,7 +7,7 @@ using ..fft: ifftn_mpi!, fftn_mpi!, Plan
 using ..mesh: Wavenumbers, WavenumbersGPU
 using ..state: State, StateGPU
 using ..config: Config
-using ..Forcing: force_system
+using ..Forcing: force_system!
 
 using CUDA
 
@@ -20,11 +20,11 @@ using CUDA
     ;
     out::XARRAY
 ) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4} where WAVE <: AbstractWavenumbers
-    j = complex(0, 1)
+    j::ComplexF64 = complex(0., 1.)
 
-    ifftn_mpi!(parallel, K, plan, j*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1]), out[:, :, :, 3])
-    ifftn_mpi!(parallel, K, plan, j*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3]), out[:, :, :, 2])
-    ifftn_mpi!(parallel, K, plan, j*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2]), out[:, :, :, 1])
+    ifftn_mpi!(parallel, K, plan, j.*(K[2].*input[:, :, :, 3] .- K[3].*input[:, :, :, 2]), out[:, :, :, 1])
+    ifftn_mpi!(parallel, K, plan, j.*(K[3].*input[:, :, :, 1] .- K[1].*input[:, :, :, 3]), out[:, :, :, 2])
+    ifftn_mpi!(parallel, K, plan, j.*(K[1].*input[:, :, :, 2] .- K[2].*input[:, :, :, 1]), out[:, :, :, 3])
 
     nothing
 end
@@ -148,23 +148,26 @@ function __compute_rhs!(
     cross!(parallel, state.fft_plan, U, state.curl; out = state.dU)
     state.dU .*= state.dealias
 
-    state.P_hat[:, :, :] .= complex(0., 0);
     # compute P_hat = sum(dU * K_over_K²):
     sum!(state.P_hat, state.dU .* state.K_over_K²)
 
     # compute forcing
-    forcing_term = force_system(parallel, forcing, U_hat, U)
+    forcing_term = force_system!(parallel, forcing, U_hat, U)
     if forcing_term != nothing
-        sum!(state.P_hat, forcing_term .* state.K_over_K²)
+        state.P_hat .+= dropdims(sum(forcing_term .* state.K_over_K²; dims=4); dims=4)
     end
     
     # add Pressure term to dU/dt
     wavenumber_product!(state.P_hat, K; out = state.wavenumber_product_tmp)
     state.dU .-= state.wavenumber_product_tmp
 
+    # now, add the forcing term to the NS RHS
+    if forcing_term != nothing
+        state.dU .+= forcing_term
+    end
+
     # dU is now the Eulerian term / Nonlinear term in the NSE
     # now calculate the diffusion term
-
     state.dU .-= state.ν .* state.K² .* U_hat
 end
 
