@@ -1,4 +1,6 @@
 /Manifest.toml
 *.sif
 pluto/* backup *.jl
-./jupyter/.ipynb_checkpoints/
+jupyter/.ipynb_checkpoints/
+jupyter/.ipynb_checkpoints/*
+**/*.h5
