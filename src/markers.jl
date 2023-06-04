@@ -17,6 +17,7 @@ export AbstractInitialCondition, TaylorGreen, LoadInitialCondition
 
 abstract type AbstractInitialCondition end
 struct TaylorGreen <: AbstractInitialCondition end
+struct ABC <: AbstractInitialCondition end
 struct LoadInitialCondition <: AbstractInitialCondition end
 
 # State
