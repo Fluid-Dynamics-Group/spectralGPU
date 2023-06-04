@@ -4,7 +4,7 @@ using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractC
 using ..fft: ifftn_mpi!, fftn_mpi!
 using ..mesh: Wavenumbers, WavenumbersGPU
 using ..state: State, StateGPU
-using ..config: Config, calculate_dt
+using ..Configuration: Config, calculate_dt
 using ..solver: compute_rhs! 
 import ..Io
 
@@ -49,7 +49,7 @@ function __integrate(
     t::Float64 = 0.
     tstep::Int = 0
 
-    dt = calculate_dt(U, config)
+    dt = calculate_dt(config)
 
     #println("dt is " * string(dt))
     

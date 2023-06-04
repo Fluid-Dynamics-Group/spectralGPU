@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate, Forcing
+using .spectralGPU: mesh, fft, markers, initial_condition, state, Configuration, solver, Integrate, Forcing
 using Test
 using CUDA
 
@@ -21,11 +21,12 @@ end
 
     N = 64
     K = mesh.wavenumbers_gpu(N)
-    cfg = config.create_config(N, 40., 0.00001)
-
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
     plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
+    cfg = Configuration.create_config(N, 40., 0.00001, U)
+
 
     @test begin
         st::state.StateGPU = state.create_state_gpu(N, K, cfg, plan)
@@ -111,12 +112,12 @@ end
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
-    cfg = config.taylor_green_validation()
+    cfg = Configuration.taylor_green_validation()
     plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
     st = state.create_state_gpu(N, K, cfg, plan)
 
     msh = mesh.new_mesh(N)
-    cfg = config.create_config(N, re, 1.0)
+    cfg = Configuration.create_config(N, re, 1.0, U)
 
     forcing = Forcing.Unforced();
 
@@ -274,7 +275,7 @@ end
 
     plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
     msh = mesh.new_mesh(N)
-    cfg = config.taylor_green_validation()
+    cfg = Configuration.taylor_green_validation()
     st = state.create_state_gpu(N, K, cfg, plan)
     ic = markers.TaylorGreen()
 

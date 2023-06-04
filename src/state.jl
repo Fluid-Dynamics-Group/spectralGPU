@@ -2,7 +2,7 @@ module state
 
 using ..mesh: Wavenumbers
 using ..markers: AbstractState, AbstractWavenumbers, AbstractConfig
-using ..config: Config
+using ..Configuration: Config
 using ..fft: Plan
 
 using CUDA

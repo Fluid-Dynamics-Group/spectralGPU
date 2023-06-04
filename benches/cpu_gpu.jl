@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate
+using .spectralGPU: mesh, fft, markers, initial_condition, state, Configuration, solver, Integrate, Forcing
 
 using CUDA
 using BenchmarkTools
@@ -8,12 +8,12 @@ using BenchmarkTools
 ######### GPU benchmark
 #########
 
-N = 128
+N = 64
 begin
     local parallel = markers.SingleThreadGPU()
 
     local K = mesh.wavenumbers_gpu(N)
-    local cfg = config.taylor_green_validation()
+    local cfg = Configuration.taylor_green_validation()
     local msh = mesh.new_mesh(N)
     local ic = markers.TaylorGreen()
 
@@ -23,6 +23,9 @@ begin
     initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat,plan)
     local st = state.create_state_gpu(N, K, cfg,plan)
 
+    local forcing = Forcing.Unforced()
+    local exports = Vector{markers.AbstractIoExport}()
+
     r = @benchmark Integrate.integrate(
         $parallel,
         $K,
@@ -30,6 +33,8 @@ begin
         $st,
         $U,
         $U_hat,
+        $forcing,
+        $exports
     )
 
     println("GPU full solver integration")
@@ -45,7 +50,7 @@ begin
     local parallel = markers.SingleThreadCPU()
 
     local K = mesh.wavenumbers(N)
-    local cfg = config.taylor_green_validation()
+    local cfg = Configuration.taylor_green_validation()
     local msh = mesh.new_mesh(N)
     local ic = markers.TaylorGreen()
 
@@ -55,6 +60,9 @@ begin
     initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
     local st = state.create_state(N, K, cfg, plan)
 
+    local forcing = Forcing.Unforced()
+    local exports = Vector{markers.AbstractIoExport}()
+
     r = @benchmark Integrate.integrate(
         $parallel,
         $K,
@@ -62,6 +70,8 @@ begin
         $st,
         $U,
         $U_hat,
+        $forcing,
+        $exports
     )
 
     println("CPU full solver integration")

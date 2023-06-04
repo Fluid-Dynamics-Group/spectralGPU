@@ -33,8 +33,12 @@ abstract type AbstractWavenumbers end
 export AbstractConfig, ProductionConfig, ValidationConfig
 
 abstract type AbstractConfig end
-struct ProductionConfig <: AbstractConfig end
-struct ValidationConfig <: AbstractConfig end
+struct ProductionConfig <: AbstractConfig 
+    max_velocity::Float64
+end
+struct ValidationConfig <: AbstractConfig 
+    fixed_dt::Float64
+end
 
 # forcing
 export AbstractForcing
@@ -51,6 +55,12 @@ export AbstractIoExport
 
 abstract type AbstractIoExport end
 
+# Export History
+export AbstractHistory, AbstractScalarHistory
+
+abstract type AbstractHistory end
+# TODO: document required interfaces
+abstract type AbstractScalarHistory <: AbstractHistory end
 
 #
 end

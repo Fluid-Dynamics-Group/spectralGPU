@@ -1,4 +1,4 @@
-module config
+module Configuration
 
 using ..markers: AbstractConfig, ProductionConfig, ValidationConfig
 
@@ -14,9 +14,10 @@ struct Config{C <: AbstractConfig}
     mode::C
 end
 
-function create_config(N::Int, re::Float64, time::Float64)::Config{ProductionConfig}
+function create_config(N::Int, re::Float64, time::Float64, U::ARR)::Config{ProductionConfig} where ARR <: AbstractArray{Float64, 4}
     ν = 1 / re
-    return Config(ν, re, N, time, ProductionConfig())
+    max_velocity = maximum(U)
+    return Config(ν, re, N, time, ProductionConfig(max_velocity))
 end
 
 function taylor_green_validation()::Config{ValidationConfig}
@@ -26,21 +27,21 @@ function taylor_green_validation()::Config{ValidationConfig}
 
     t = 0.1
 
-    return Config(ν, re, N, t, ValidationConfig())
+    return Config(ν, re, N, t, ValidationConfig(0.01))
 end
 
 cfl_calc(max_velo::Float64, N::Int) = 0.75 / (N * max_velo)
 
-function calculate_dt(velocity::XARRAY, cfg::Config{ProductionConfig})::Float64 where XARRAY <: AbstractArray{Float64, 4}
-    max_velo = maximum(velocity)
+function calculate_dt(cfg::Config{ProductionConfig})::Float64
+    max_velo = cfg.mode.max_velocity
     return cfl_calc(max_velo, cfg.N)
 end
 
 #
 # Validation dt cases
 #
-function calculate_dt(velocity::XARRAY, cfg::Config{ValidationConfig})::Float64 where XARRAY <: AbstractArray{Float64, 4}
-    return 0.01
+function calculate_dt(cfg::Config{ValidationConfig})::Float64
+    return cfg.mode.fixed_dt
 end
 
 #

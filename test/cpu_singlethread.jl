@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate, Forcing, Io
+using .spectralGPU: mesh, fft, markers, initial_condition, state, Configuration, solver, Integrate, Forcing, Io
 using Test
 using Printf
 
@@ -138,7 +138,7 @@ end
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
 
-    cfg = config.taylor_green_validation()
+    cfg = Configuration.taylor_green_validation()
     plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     st = state.create_state(N, K, cfg, plan)
@@ -299,12 +299,13 @@ end
     time = 0.05
 
     K = mesh.wavenumbers(N)
-    cfg = config.create_config(N, re, time)
-    msh = mesh.new_mesh(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
     plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
+    cfg = Configuration.create_config(N, re, time, U)
+    msh = mesh.new_mesh(N)
 
     st = state.create_state(N, K, cfg, plan)
 
@@ -333,7 +334,7 @@ end
     forcing = Forcing.Unforced();
 
     K = mesh.wavenumbers(N)
-    cfg = config.taylor_green_validation()
+    cfg = Configuration.taylor_green_validation()
     msh = mesh.new_mesh(N)
     ic = markers.TaylorGreen()
 

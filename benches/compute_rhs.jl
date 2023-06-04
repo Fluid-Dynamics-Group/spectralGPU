@@ -1,10 +1,10 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate
+using .spectralGPU: mesh, fft, markers, initial_condition, state, Configuration, solver, Integrate, Forcing
 
 using CUDA
 using BenchmarkTools
 
-N = 256
+N = 128
 
 begin
     local rk_step = 2
@@ -17,11 +17,13 @@ begin
 
     local msh = mesh.new_mesh(N)
     local ic = markers.TaylorGreen()
-    local cfg = config.taylor_green_validation()
+    local cfg = Configuration.taylor_green_validation()
     initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
     local st = state.create_state_gpu(N, K, cfg,plan)
 
-    r = @benchmark @views solver.compute_rhs!($rk_step, $parallel, $K, $U, $U_hat, $st)
+    forcing = Forcing.Unforced()
+
+    r = @benchmark @views solver.compute_rhs!($rk_step, $parallel, $K, $U, $U_hat, $st, $forcing)
 
     println("GPU compute rhs")
     display(r)
@@ -39,11 +41,13 @@ begin
 
     local msh = mesh.new_mesh(N)
     local ic = markers.TaylorGreen()
-    local cfg = config.taylor_green_validation()
+    local cfg = Configuration.taylor_green_validation()
     initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
     local st = state.create_state(N, K, cfg,plan)
 
-    r = @benchmark @views solver.compute_rhs!($rk_step, $parallel, $K, $U, $U_hat, $st)
+    forcing = Forcing.Unforced()
+
+    r = @benchmark @views solver.compute_rhs!($rk_step, $parallel, $K, $U, $U_hat, $st, $forcing)
 
     println("CPU compute rhs")
     display(r)

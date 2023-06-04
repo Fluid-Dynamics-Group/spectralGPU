@@ -9,6 +9,7 @@ begin
 	using CUDA
 	using LazyGrids
 	using FFTW
+	using HDF5
 end
 
 # ╔═╡ a84decbd-bb3e-4c6e-825a-8175f8a1323f
@@ -92,14 +93,14 @@ function run_solver(N)#::Array{Float64, 4}
 	ic = solver.markers.TaylorGreen()
 
 	runtime = 1.1
-	# config = solver.config.create_config(N, RE, runtkime)
-	config = solver.config.taylor_green_validation()
+	# config = solver.config.taylor_green_validation()
 	mesh = solver.mesh.new_mesh(N)
 	
 	U = CuArray(zeros(N, N, N, 3));
 	U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)));
 	plan = solver.fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 	solver.initial_condition.setup_initial_condition(parallel, ic, mesh, U, U_hat, plan)
+	config = solver.Configuration.create_config(N, RE, runtime, U)
 
 	state = solver.state.create_state_gpu(N, K, config, plan)
 
@@ -112,22 +113,32 @@ function run_solver(N)#::Array{Float64, 4}
 	fᵤ = CuArray(zeros(N, N, N, 3))
 	f̂ᵤ = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 	
-	# forcing = EnergyHelicityForcing(state, K, ϵ₁, ϵ₂, f₁, f₂, fᵤ, f̂ᵤ)
-	forcing = solver.Forcing.Unforced();
-	
+	forcing = EnergyHelicityForcing(state, K, ϵ₁, ϵ₂, f₁, f₂, fᵤ, f̂ᵤ)
+	# forcing = solver.Forcing.Unforced();
+
+	energy_step = solver.Io.dt_write(0.01)
 	energy_export = solver.Exporters.EnergyExport(
 		N,
-		solver.Io.dt_write(0.01),
-		Vector{Float64}(),
+		energy_step,
+		solver.Exporters.scalar_memory_history(energy_step,config),
 		U
 	)
+
+	# touch("h5out.h5")
+	path = "h5out.h5"
+	if isfile(path)
+		rm(path)
+	end
+	f = HDF5.h5open(path, "w")
+	
+	helicity_step = solver.Io.dt_write(0.01)
 	helicity_export = solver.Exporters.HelicityExport(
 		N,
 		parallel,
 		K,
 		plan,
-		solver.Io.dt_write(0.01),
-		Vector{Float64}(),
+		helicity_step,
+		solver.Exporters.scalar_h5_history(helicity_step, f, "helicity", config),
 		U_hat,
 		U,
 		state.curl
@@ -139,20 +150,8 @@ function run_solver(N)#::Array{Float64, 4}
 	
 	solver.Integrate.integrate(parallel, K, config, state, U, U_hat, forcing, exports);
 
-	u_cpu = Array(U)
-
-	CUDA.unsafe_free!(U)
-	CUDA.unsafe_free!(U_hat)
-	CUDA.unsafe_free!(state.dU)
-	CUDA.unsafe_free!(state.U_hat₁)
-	CUDA.unsafe_free!(state.U_hat₀)
-	CUDA.unsafe_free!(state.curl)
-	CUDA.unsafe_free!(state.dealias)
-	CUDA.unsafe_free!(state.P_hat)
-	CUDA.unsafe_free!(state.K²)
-	CUDA.unsafe_free!(state.K_over_K²)
-	CUDA.unsafe_free!(state.wavenumber_product_tmp)
-	CUDA.unsafe_free!(state.ν)
+	CUDA.reclaim()
+	close(f)
 
 	energy_export.history, helicity_export.history
 end
@@ -181,32 +180,6 @@ d[1][9+1]
 # ╔═╡ a5ff544c-fe7a-4a05-a0d8-4cdac964a673
 complex(0, 1)
 
-# ╔═╡ 46abcfad-161d-4e07-a042-7d713443b586
-@views function __curl!(
-    parallel::P, 
-    K, 
-    plan,
-    input::FARRAY
-    ;
-    out::XARRAY
-) where P <: AbstractParallel where FARRAY <: AbstractArray{ComplexF64, 4} where XARRAY <: AbstractArray{Float64, 4}
-    j::ComplexF64 = complex(0., 1.)
-
-    solver.fft.ifftn_mpi!(
-		parallel, K, plan, 
-		j.*(Array(K[2]).*input[:, :, :, 3] .- Array(K[3]).*input[:, :, :, 2]), out[:, :, :, 1]
-	)
-    solver.fft.ifftn_mpi!(
-		parallel, K, plan, 
-		j.*(Array(K[3]).*input[:, :, :, 1] .- Array(K[1]).*input[:, :, :, 3]), out[:, :, :, 2]
-	)
-    solver.fft.ifftn_mpi!(parallel, K, plan, 
-		j.*(Array(K[1]).*input[:, :, :, 2] .- Array(K[2]).*input[:, :, :, 1]), out[:, :, :, 3]
-	)
-
-    nothing
-end
-
 # ╔═╡ 823795bc-4e98-4b8d-a2eb-436881ef36ed
 begin
 	N = 128
@@ -220,7 +193,7 @@ begin
 	plan = solver.fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 	
 	# config = solver.config.create_config(N, 40., 15.)
-	config = solver.config.taylor_green_validation()
+	config = solver.Configuration.taylor_green_validation()
 	state = solver.state.create_state(N, K, config, plan)
 
 	mesh = solver.mesh.new_mesh(N)
@@ -376,19 +349,33 @@ begin
 	fig
 end
 
+# ╔═╡ c787ca2e-0e8b-40ef-98bf-a4f52c9018ec
+fid = h5open("f.h5", "w")
+
+# ╔═╡ eb2003b5-4052-4ca7-87f7-dba8b080bb93
+ds = create_dataset(fid, "dataset", Float64, 10)
+
+# ╔═╡ ad77e77c-bb4c-4d76-a133-3b3632bd5bc3
+ds[1] = 10.
+
+# ╔═╡ 662e4c50-2655-4ea9-b627-2516959ea944
+close(fid)
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 LazyGrids = "7031d0ef-c40d-4431-b2f8-61a8d2f650db"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
-CUDA = "~4.2.0"
+CUDA = "~4.3.2"
 CairoMakie = "~0.10.5"
 FFTW = "~1.6.0"
+HDF5 = "~0.16.15"
 LazyGrids = "~0.5.0"
 """
 
@@ -398,7 +385,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.0"
 manifest_format = "2.0"
-project_hash = "e09802cb4d479be5305b78c9cebdb220ae0a0052"
+project_hash = "4764fbd910e448e06475c148dfbedecf31be045b"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -487,9 +474,9 @@ uuid = "8bf52ea8-c179-5cab-976a-9e18b702a9bc"
 
 [[deps.CUDA]]
 deps = ["AbstractFFTs", "Adapt", "BFloat16s", "CEnum", "CUDA_Driver_jll", "CUDA_Runtime_Discovery", "CUDA_Runtime_jll", "CompilerSupportLibraries_jll", "ExprTools", "GPUArrays", "GPUCompiler", "KernelAbstractions", "LLVM", "LazyArtifacts", "Libdl", "LinearAlgebra", "Logging", "Preferences", "Printf", "Random", "Random123", "RandomNumbers", "Reexport", "Requires", "SparseArrays", "SpecialFunctions", "UnsafeAtomicsLLVM"]
-git-tree-sha1 = "280893f920654ebfaaaa1999fbd975689051f890"
+git-tree-sha1 = "442d989978ed3ff4e174c928ee879dc09d1ef693"
 uuid = "052768ef-5323-5732-b1bb-66c8b64840ba"
-version = "4.2.0"
+version = "4.3.2"
 
 [[deps.CUDA_Driver_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
@@ -626,9 +613,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[deps.Distributions]]
 deps = ["FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "Test"]
-git-tree-sha1 = "aa8ae1e8e8d4b5ef38a8fbc028fc75f3c5cad73d"
+git-tree-sha1 = "c72970914c8a21b36bbc244e9df0ed1834a0360b"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.25.94"
+version = "0.25.95"
 
     [deps.Distributions.extensions]
     DistributionsChainRulesCoreExt = "ChainRulesCore"
@@ -712,9 +699,9 @@ uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
 [[deps.FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
-git-tree-sha1 = "fa10570aee20250d446c9951b459c63529b1107c"
+git-tree-sha1 = "ed569cb9e7e3590d5ba884da7edc50216aac5811"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "1.0.2"
+version = "1.1.0"
 
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
@@ -764,21 +751,21 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[deps.GPUArrays]]
 deps = ["Adapt", "GPUArraysCore", "LLVM", "LinearAlgebra", "Printf", "Random", "Reexport", "Serialization", "Statistics"]
-git-tree-sha1 = "9ade6983c3dbbd492cf5729f865fe030d1541463"
+git-tree-sha1 = "a3351bc577a6b49297248aadc23a4add1097c2ac"
 uuid = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
-version = "8.6.6"
+version = "8.7.1"
 
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
-git-tree-sha1 = "1cd7f0af1aa58abc02ea1d872953a97359cb87fa"
+git-tree-sha1 = "2d6ca471a6c7b536127afccfa7564b5b39227fe0"
 uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
-version = "0.1.4"
+version = "0.1.5"
 
 [[deps.GPUCompiler]]
 deps = ["ExprTools", "InteractiveUtils", "LLVM", "Libdl", "Logging", "Scratch", "TimerOutputs", "UUIDs"]
-git-tree-sha1 = "5737dc242dadd392d934ee330c69ceff47f0259c"
+git-tree-sha1 = "cb090aea21c6ca78d59672a7e7d13bd56d09de64"
 uuid = "61eb1bfa-7361-4325-ad38-22787b887f55"
-version = "0.19.4"
+version = "0.20.3"
 
 [[deps.GeoInterface]]
 deps = ["Extents"]
@@ -826,6 +813,18 @@ version = "0.9.1"
 git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
 uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
 version = "1.0.2"
+
+[[deps.HDF5]]
+deps = ["Compat", "HDF5_jll", "Libdl", "Mmap", "Random", "Requires", "UUIDs"]
+git-tree-sha1 = "c73fdc3d9da7700691848b78c61841274076932a"
+uuid = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+version = "0.16.15"
+
+[[deps.HDF5_jll]]
+deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "Libdl", "OpenSSL_jll", "Pkg", "Zlib_jll"]
+git-tree-sha1 = "4cc2bb72df6ff40b055295fdef6d92955f9dede8"
+uuid = "0234f1f7-429e-5d53-9886-15a909be8d59"
+version = "1.12.2+2"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
@@ -1072,9 +1071,9 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
-git-tree-sha1 = "0a1b7c2863e44523180fdb3146534e265a91870b"
+git-tree-sha1 = "c3ce8e7420b3a6e071e0fe4745f5d4300e37b13f"
 uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
-version = "0.3.23"
+version = "0.3.24"
 
     [deps.LogExpFunctions.extensions]
     LogExpFunctionsChainRulesCoreExt = "ChainRulesCore"
@@ -1219,10 +1218,10 @@ uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 version = "0.8.1+0"
 
 [[deps.OpenSSL_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "9ff31d101d987eb9d66bd8b176ac7c277beccd09"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "1aa4b74f80b01c6bc2b89992b861b5f210e665b5"
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
-version = "1.1.20+0"
+version = "1.1.21+0"
 
 [[deps.OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
@@ -1312,9 +1311,9 @@ version = "0.1.2"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
-git-tree-sha1 = "259e206946c293698122f63e2b513a7c99a244e8"
+git-tree-sha1 = "9673d39decc5feece56ef3940e5dafba15ba0f81"
 uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
-version = "1.1.1"
+version = "1.1.2"
 
 [[deps.Preferences]]
 deps = ["TOML"]
@@ -1815,7 +1814,6 @@ version = "3.5.0+0"
 # ╠═94ccf9c1-5822-4df5-b00f-30a25cc500ca
 # ╠═025845a1-6607-497f-b04b-33674a7600de
 # ╠═a5ff544c-fe7a-4a05-a0d8-4cdac964a673
-# ╠═46abcfad-161d-4e07-a042-7d713443b586
 # ╠═823795bc-4e98-4b8d-a2eb-436881ef36ed
 # ╟─1d976523-95c4-4ee9-b2ca-fc68c0fcc47d
 # ╠═f5d6672d-fbc3-45ae-b053-d400bef7ff61
@@ -1835,5 +1833,9 @@ version = "3.5.0+0"
 # ╠═b887166b-5e83-44c2-b3d1-2296ae44065e
 # ╠═e5c2b994-bee0-43db-aa08-1488e927684b
 # ╠═a829c124-668d-4ccf-a453-ce6d1169ce4a
+# ╠═c787ca2e-0e8b-40ef-98bf-a4f52c9018ec
+# ╠═eb2003b5-4052-4ca7-87f7-dba8b080bb93
+# ╠═ad77e77c-bb4c-4d76-a133-3b3632bd5bc3
+# ╠═662e4c50-2655-4ea9-b627-2516959ea944
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

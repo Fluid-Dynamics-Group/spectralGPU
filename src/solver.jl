@@ -6,7 +6,7 @@ using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractC
 using ..fft: ifftn_mpi!, fftn_mpi!, Plan
 using ..mesh: Wavenumbers, WavenumbersGPU
 using ..state: State, StateGPU
-using ..config: Config
+using ..Configuration: Config
 using ..Forcing: force_system!
 
 using CUDA

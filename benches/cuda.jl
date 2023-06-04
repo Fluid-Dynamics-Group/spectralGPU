@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, config, solver, Integrate
+using .spectralGPU: mesh, fft, markers, initial_condition, state, solver, Integrate
 using CUDA
 using BenchmarkTools
 
