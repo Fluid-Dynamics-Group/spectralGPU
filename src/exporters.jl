@@ -10,6 +10,13 @@ import ..Configuration
 
 using HDF5
 
+#################
+################# In memory / HDF5 history containers
+#################
+
+#
+# In memory scalar history
+#
 struct ScalarMemoryHistory <: AbstractScalarHistory
     len::Int
     inner::Vector{Float64}
@@ -31,6 +38,9 @@ function scalar_memory_history(
     ScalarMemoryHistory(len, zeros(len))
 end
 
+#
+# HDF5 scalar history 
+#
 struct ScalarH5History <: AbstractScalarHistory
     len::Int
     inner::HDF5.Dataset
@@ -46,10 +56,13 @@ function scalar_h5_history(stepper::STEP, h5_file, name::String, config::Configu
     ScalarH5History(len, HDF5.create_dataset(h5_file, name, Float64, len))
 end
 
-#
-# In memory exporters
-#
+#################
+################# Calculators for exported quantities
+#################
 
+#
+# Energy
+#
 struct EnergyExport{ARR <: AbstractArray{Float64, 4}, HIST <: AbstractScalarHistory} <: AbstractIoExport
     N::Int
 	stepper::Io.DtWrite
@@ -65,10 +78,13 @@ function Io.export_data(exporter::EnergyExport{ARR}, time::Float64) where ARR <:
     exporter.history[step] = energy
 end
 	
-function Io.get_stepper(exporter::EnergyExport{ARR}) where ARR <: AbstractArray{Float64, 4}
+function Io.get_stepper(exporter::EnergyExport{ARR, HIST}) where ARR <: AbstractArray{Float64, 4} where HIST <: AbstractScalarHistory
 	exporter.stepper
 end
 
+#
+# Helicity
+#
 struct HelicityExport{FARR <: AbstractArray{ComplexF64, 4}, ARR <: AbstractArray{Float64, 4}, P <: AbstractParallel, WAVE <: AbstractWavenumbers, HIST <: AbstractScalarHistory} <: AbstractIoExport 
     N::Int
     parallel::P
@@ -81,8 +97,8 @@ struct HelicityExport{FARR <: AbstractArray{ComplexF64, 4}, ARR <: AbstractArray
 	omega::ARR
 end
 
-function Io.export_data(exporter::HelicityExport{FARR, ARR, P, K}, time::Float64
-) where ARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4} where P <: AbstractParallel where K <: AbstractWavenumbers
+function Io.export_data(exporter::HelicityExport{FARR, ARR, P, K, HIST}, time::Float64
+) where ARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4} where P <: AbstractParallel where K <: AbstractWavenumbers where HIST<: AbstractScalarHistory
 
     solver.curl!(exporter.parallel, exporter.K, exporter.plan, exporter.U_hat; out = exporter.omega)
 	helicity = sum(exporter.U .* exporter.omega) / 2.
@@ -93,6 +109,24 @@ function Io.export_data(exporter::HelicityExport{FARR, ARR, P, K}, time::Float64
 end
 	
 function Io.get_stepper(exporter::HelicityExport)
+	exporter.stepper
+end
+
+#
+# Time
+#
+struct TimeExport{HIST <: AbstractScalarHistory} <: AbstractIoExport 
+	stepper::Io.DtWrite
+	history::HIST
+end
+
+function Io.export_data(exporter::TimeExport{HIST}, time::Float64
+) where HIST <: AbstractScalarHistory
+    step = Io.step_number(exporter.stepper)
+    exporter.history[step] = time
+end
+	
+function Io.get_stepper(exporter::TimeExport)
 	exporter.stepper
 end
 
