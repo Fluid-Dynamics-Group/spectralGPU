@@ -37,31 +37,49 @@ function load_trajectories(path::String, cpu::Bool)::Trajectories
 	Trajectories(energy, helicity, time)
 end
 
-# ╔═╡ af27b4cf-8432-4832-a561-f0cb2da1ccb2
-h5 = HDF5.h5open("/home/brooks/traj_compare/cpu_tg_baseline.h5")
-
 # ╔═╡ 04f2eecd-dc68-4347-baa5-9b3afeda4e9d
 cpu_tg = load_trajectories("/home/brooks/traj_compare/cpu_tg_baseline.h5", true)
 
 # ╔═╡ fd00638e-d1b6-44e6-bd66-c20476ee168d
 gpu_tg = load_trajectories("/home/brooks/traj_compare/gpu_tg_baseline.h5", false)
 
+# ╔═╡ c77b4208-689d-424a-a0a7-35dbe37ccd73
+cpu_abc = load_trajectories("/home/brooks/traj_compare/cpu_abc_baseline.h5", true)
+
+# ╔═╡ 236c7518-70e0-48b6-a09b-253cd6cff947
+gpu_abc = load_trajectories("/home/brooks/traj_compare/gpu_abc_baseline.h5", false)
+
+# ╔═╡ c0a924d0-1ae7-4cf1-ac63-ecb8a5a35912
+cpu_tg_helicity = load_trajectories("/home/brooks/traj_compare/cpu_tg_epsilon2_1.h5", true)
+
+# ╔═╡ 6819ebb1-f5d7-4155-8975-829035b22136
+gpu_tg_helicity = load_trajectories("/home/brooks/traj_compare/gpu_tg_epsilon2_1.h5", false)
+
+# ╔═╡ 1880c54f-2c6c-404d-8d47-4329d322a84a
+cpu_tg_energy = load_trajectories("/home/brooks/traj_compare/cpu_tg_epsilon1.h5", true)
+
+# ╔═╡ 6c3f588e-fd7c-47ab-bb79-7960059f46bb
+gpu_tg_energy = load_trajectories("/home/brooks/traj_compare/gpu_tg_epsilon1.h5", false)
+
 # ╔═╡ 9f93b387-2364-4887-987f-527778ac0324
 begin
 	local fig = Figure()
-	local ax = Axis(fig[1,1], title = "Taylor Green Baseline Validation N = 64 Re = 256")
+	local ax = Axis(fig[1,1], title = "Taylor Green Energy Forcing N = 64 Re = 256", ylabel = "E(t)", xlabel = "t [s]")
+
+	local cpu = cpu_tg_energy
+	local gpu = gpu_tg_energy
 
 	lines!(
 		ax,
-		cpu_tg.time,
-		cpu_tg.energy,
+		cpu.time,
+		cpu.energy,
 		label = "CPU",
 		linewidth = 10
 	)
 	lines!(
 		ax,
-		gpu_tg.time,
-		gpu_tg.energy,
+		gpu.time,
+		gpu.energy,
 		label = "GPU",
 		linewidth = 7,
 		linestyle = :dash
@@ -71,6 +89,21 @@ begin
 
 	fig
 end
+
+# ╔═╡ cfdc8017-aad3-4101-992e-16f3d2ad482b
+arr = read(h5["velocity"])
+
+# ╔═╡ 4b77008d-12aa-409c-a532-b290c6c34c1c
+permutedims(arr, reverse(1:4))
+
+# ╔═╡ af27b4cf-8432-4832-a561-f0cb2da1ccb2
+# ╠═╡ disabled = true
+#=╠═╡
+h5 = HDF5.h5open("/home/brooks/traj_compare/cpu_tg_baseline.h5")
+  ╠═╡ =#
+
+# ╔═╡ ab0fa25e-f962-463f-b944-3a2b96ca76ec
+h5 = h5open("/home/brooks/github/selective-modification/initial_conditions/single_ring/n128/initial_condition.h5", "r")
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1402,6 +1435,15 @@ version = "3.5.0+0"
 # ╠═af27b4cf-8432-4832-a561-f0cb2da1ccb2
 # ╠═04f2eecd-dc68-4347-baa5-9b3afeda4e9d
 # ╠═fd00638e-d1b6-44e6-bd66-c20476ee168d
+# ╠═c77b4208-689d-424a-a0a7-35dbe37ccd73
+# ╠═236c7518-70e0-48b6-a09b-253cd6cff947
+# ╠═c0a924d0-1ae7-4cf1-ac63-ecb8a5a35912
+# ╠═6819ebb1-f5d7-4155-8975-829035b22136
+# ╠═1880c54f-2c6c-404d-8d47-4329d322a84a
+# ╠═6c3f588e-fd7c-47ab-bb79-7960059f46bb
 # ╠═9f93b387-2364-4887-987f-527778ac0324
+# ╠═ab0fa25e-f962-463f-b944-3a2b96ca76ec
+# ╠═cfdc8017-aad3-4101-992e-16f3d2ad482b
+# ╠═4b77008d-12aa-409c-a532-b290c6c34c1c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

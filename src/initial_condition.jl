@@ -2,7 +2,7 @@ module initial_condition
 
 using ..mesh: Mesh
 using ..fft: fftn_mpi!, Plan
-using ..markers: AbstractInitialCondition, AbstractParallel, TaylorGreen, ABC
+using ..markers: AbstractInitialCondition, AbstractParallel, TaylorGreen, ABC, LoadInitialCondition
 
 using CUDA
 
@@ -54,6 +54,21 @@ function setup_initial_condition(
     U[:, :, :, 2] .= B .* sin.(mesh.x) .+ A .* cos.(mesh.z)
     U[:, :, :, 3] .= C .* sin.(mesh.y) .+ B .* cos.(mesh.x)
 
+    @views for i in 1:3
+        fftn_mpi!(parallel, plan, U[:, :, :, i], U_hat[:, :, :, i])
+    end
+end
+
+# Load the initial condition from a file
+function setup_initial_condition(
+    parallel::P, 
+    ic::LoadInitialCondition, 
+    mesh::Mesh, 
+    U::XARR,
+    U_hat::FARR,
+    plan::Plan
+) where P <: AbstractParallel where XARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4}
+    # U should be loaded before now, all we have to do is the forward transform
     @views for i in 1:3
         fftn_mpi!(parallel, plan, U[:, :, :, i], U_hat[:, :, :, i])
     end
