@@ -62,6 +62,8 @@ export AbstractHistory, AbstractScalarHistory
 abstract type AbstractHistory end
 # TODO: document required interfaces
 abstract type AbstractScalarHistory <: AbstractHistory end
+# TODO: document required interfaces
+abstract type AbstractVectorFieldHistory <: AbstractHistory end
 
 #
 end

@@ -1,8 +1,9 @@
 module Exporters
 
 export EnergyExport, HelicityExport, ScalarMemoryHistory, ScalarH5History, scalar_h5_history, scalar_memory_history
+export VectorFieldExport, vector_field_h5_history
 
-using ..markers: AbstractIoExport, AbstractParallel, AbstractWavenumbers, AbstractScalarHistory, AbstractIoStepControl, AbstractState, AbstractConfig
+using ..markers: AbstractIoExport, AbstractParallel, AbstractWavenumbers, AbstractScalarHistory, AbstractIoStepControl, AbstractState, AbstractConfig, AbstractVectorFieldHistory
 using ..fft: Plan
 import ..solver
 import ..Io
@@ -54,6 +55,26 @@ function scalar_h5_history(stepper::STEP, h5_file, name::String, config::Configu
     dt = Configuration.calculate_dt(config)
     len = Io.num_writes(stepper, dt, config.time)
     ScalarH5History(len, HDF5.create_dataset(h5_file, name, Float64, len))
+end
+
+#
+# HDF5 vector field (4dim) history 
+#
+struct VectorFieldH5History <: AbstractVectorFieldHistory
+    len::Int
+    inner::HDF5.Dataset
+end
+function Base.setindex!(hist::VectorFieldH5History, value::ARR, idx::Int) where ARR <: AbstractArray{Float64, 4}
+    if idx <= hist.len
+        # x, y, z, component, vector write index
+        hist.inner[:, :, :, :, idx] = value
+    end
+end
+function vector_field_h5_history(stepper::STEP, h5_file, name::String, config::Configuration.Config{CONFIG})::VectorFieldH5History where STEP <: AbstractIoStepControl where CONFIG <: AbstractConfig
+    dt = Configuration.calculate_dt(config)
+    len = Io.num_writes(stepper, dt, config.time)
+    N = config.N
+    VectorFieldH5History(len, HDF5.create_dataset(h5_file, name, Float64, (N, N, N, 3, len)))
 end
 
 #################
@@ -127,6 +148,26 @@ function Io.export_data(exporter::TimeExport{HIST}, time::Float64
 end
 	
 function Io.get_stepper(exporter::TimeExport)
+	exporter.stepper
+end
+
+#
+# Vector Fields
+#
+struct VectorFieldExport{HIST <: AbstractVectorFieldHistory, ARR <: AbstractArray{Float64, 4}} <: AbstractIoExport 
+	stepper::Io.DtWrite
+	history::HIST
+    vector_field::ARR
+end
+
+function Io.export_data(exporter::VectorFieldExport{HIST, ARR}, time::Float64
+) where HIST <: AbstractVectorFieldHistory where ARR <: AbstractArray{Float64, 4}
+    step = Io.step_number(exporter.stepper)
+    exporter.history[step] = exporter.vector_field
+end
+	
+function Io.get_stepper(exporter::VectorFieldExport{HIST, ARR}
+) where HIST <: AbstractVectorFieldHistory where ARR <: AbstractArray{Float64, 4}
 	exporter.stepper
 end
 

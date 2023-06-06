@@ -149,11 +149,19 @@ function run_solver(N)#::Array{Float64, 4}
 		t_step,
 		solver.Exporters.scalar_h5_history(helicity_step, f, "time", config),
 	)
+
+	velocity_step = solver.Io.dt_write(0.1)
+	velocity_export = solver.Exporters.VectorFieldExport(
+		velocity_step,
+		solver.Exporters.vector_field_h5_history(velocity_step, f, "velocity", config),
+		U
+	)
 	
 	exports::Vector{solver.markers.AbstractIoExport} = [
 		energy_export,
 		helicity_export,
-		time_export
+		time_export,
+		velocity_export,
 	]
 	
 	solver.Integrate.integrate(parallel, K, config, state, U, U_hat, forcing, exports);

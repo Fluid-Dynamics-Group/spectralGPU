@@ -94,7 +94,13 @@ end
 arr = read(h5["velocity"])
 
 # ╔═╡ 4b77008d-12aa-409c-a532-b290c6c34c1c
-permutedims(arr, reverse(1:4))
+parr = permutedims(arr, [3,2,1,4])
+
+# ╔═╡ a6f4bfcf-c1b5-4865-9e34-ab5d9fc07968
+arr[:, 1, 1, 1]
+
+# ╔═╡ 491a7e17-1f16-4edb-afc3-e8bcaaca5c55
+parr[:, 1, 1, 1]
 
 # ╔═╡ af27b4cf-8432-4832-a561-f0cb2da1ccb2
 # ╠═╡ disabled = true
@@ -1445,5 +1451,7 @@ version = "3.5.0+0"
 # ╠═ab0fa25e-f962-463f-b944-3a2b96ca76ec
 # ╠═cfdc8017-aad3-4101-992e-16f3d2ad482b
 # ╠═4b77008d-12aa-409c-a532-b290c6c34c1c
+# ╠═a6f4bfcf-c1b5-4865-9e34-ab5d9fc07968
+# ╠═491a7e17-1f16-4edb-afc3-e8bcaaca5c55
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
