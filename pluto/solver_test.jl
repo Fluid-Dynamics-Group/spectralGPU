@@ -157,19 +157,32 @@ function run_solver(N)#::Array{Float64, 4}
 		U
 	)
 	
+	cos_step = solver.Io.dt_write(0.1)
+	cos_export = solver.Exporters.CosθExport(
+		cos_step,
+		solver.Exporters.scalar_field_h5_history(cos_step, f, "cos_theta", config),
+		U,
+		state.curl
+	)
+	
 	exports::Vector{solver.markers.AbstractIoExport} = [
-		energy_export,
-		helicity_export,
-		time_export,
-		velocity_export,
+		# energy_export,
+		# helicity_export,
+		# time_export,
+		# velocity_export,
+		cos_export
 	]
 	
 	solver.Integrate.integrate(parallel, K, config, state, U, U_hat, forcing, exports);
 
+	U_cpu = Array(U)
+	ω_cpu = Array(state.curl)
+
 	CUDA.reclaim()
 	close(f)
 
-	energy_export.history, helicity_export.history
+	# energy_export.history, helicity_export.history
+	U_cpu, ω_cpu
 end
 
 # ╔═╡ 66f794ab-0b4e-4403-a1e0-83e3a6b4cb18
@@ -184,14 +197,17 @@ end
 # ╔═╡ d33ec2f2-1e6b-4f98-8ccb-c86c0ae40245
 1.2629529314194748e6
 
-# ╔═╡ 94ccf9c1-5822-4df5-b00f-30a25cc500ca
-@time d = run_solver(64); d
-
 # ╔═╡ b93466cd-818a-466c-a22b-3794c1a60eb4
 d[1][9+1]
 
+# ╔═╡ 94ccf9c1-5822-4df5-b00f-30a25cc500ca
+@time U_cpu, ω_cpu = run_solver(64);
+
 # ╔═╡ 025845a1-6607-497f-b04b-33674a7600de
-# @time run_solver(256)
+dot3(a,b) = dropdims(sum(a .* b; dims=4);dims=4)
+
+# ╔═╡ 911299ee-a689-4546-92f9-8f3d1daaedef
+dot3(U_cpu, ω_cpu) ./ (sqrt.(dot3(U_cpu, U_cpu)) .* sqrt.(dot3(ω_cpu, ω_cpu)))
 
 # ╔═╡ a5ff544c-fe7a-4a05-a0d8-4cdac964a673
 complex(0, 1)
@@ -234,6 +250,9 @@ begin
 		)
 	end
 end
+
+# ╔═╡ 87c9b5d3-91d1-4972-b280-19e6f9c2d94c
+state.curl[1,1,1,1]
 
 # ╔═╡ 1d976523-95c4-4ee9-b2ca-fc68c0fcc47d
 	# @views for i in 1:3
@@ -376,6 +395,33 @@ ds[1] = 10.
 
 # ╔═╡ 662e4c50-2655-4ea9-b627-2516959ea944
 close(fid)
+
+# ╔═╡ f077faac-62ab-4ec4-8de6-6e0dbeafce51
+v1 = [2, 0, 0]
+
+# ╔═╡ 234cb6e1-6643-4f37-9044-7ccaf5df17bb
+v2 = [0, 2, 0]
+
+# ╔═╡ ec1fd7a3-72c5-4206-ac49-7fe75a5a1e97
+dot(a,b) = sum(a .* b)
+
+# ╔═╡ b90b8ba7-eb0e-4480-bc8d-42969cdb7add
+dot(v1, v2)
+
+# ╔═╡ 4ec95e3a-da95-45d0-91fa-d9fa091229bd
+dot(v1, v1)
+
+# ╔═╡ ce43721f-b1a1-4661-b4ed-eb719b4af9bc
+dot(v2, v2)
+
+# ╔═╡ 2cff3391-eb77-4aeb-b043-c52184fd1171
+dot(v1, v2) / (sqrt(dot(v1, v1)) * sqrt(dot(v2, v2)))
+
+# ╔═╡ 263a9248-9293-4c2d-8534-80453db38e85
+1/0
+
+# ╔═╡ 10e4a8d4-0094-4a9a-81ed-c82afd8a48ec
+0/0
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1829,8 +1875,10 @@ version = "3.5.0+0"
 # ╠═b93466cd-818a-466c-a22b-3794c1a60eb4
 # ╠═94ccf9c1-5822-4df5-b00f-30a25cc500ca
 # ╠═025845a1-6607-497f-b04b-33674a7600de
+# ╠═911299ee-a689-4546-92f9-8f3d1daaedef
 # ╠═a5ff544c-fe7a-4a05-a0d8-4cdac964a673
 # ╠═823795bc-4e98-4b8d-a2eb-436881ef36ed
+# ╠═87c9b5d3-91d1-4972-b280-19e6f9c2d94c
 # ╟─1d976523-95c4-4ee9-b2ca-fc68c0fcc47d
 # ╠═f5d6672d-fbc3-45ae-b053-d400bef7ff61
 # ╠═52744d0b-0491-4fcd-8f57-bf7d1d8d2852
@@ -1853,5 +1901,14 @@ version = "3.5.0+0"
 # ╠═eb2003b5-4052-4ca7-87f7-dba8b080bb93
 # ╠═ad77e77c-bb4c-4d76-a133-3b3632bd5bc3
 # ╠═662e4c50-2655-4ea9-b627-2516959ea944
+# ╠═f077faac-62ab-4ec4-8de6-6e0dbeafce51
+# ╠═234cb6e1-6643-4f37-9044-7ccaf5df17bb
+# ╠═ec1fd7a3-72c5-4206-ac49-7fe75a5a1e97
+# ╠═b90b8ba7-eb0e-4480-bc8d-42969cdb7add
+# ╠═4ec95e3a-da95-45d0-91fa-d9fa091229bd
+# ╠═ce43721f-b1a1-4661-b4ed-eb719b4af9bc
+# ╠═2cff3391-eb77-4aeb-b043-c52184fd1171
+# ╠═263a9248-9293-4c2d-8534-80453db38e85
+# ╠═10e4a8d4-0094-4a9a-81ed-c82afd8a48ec
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

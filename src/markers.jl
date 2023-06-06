@@ -57,13 +57,15 @@ export AbstractIoExport
 abstract type AbstractIoExport end
 
 # Export History
-export AbstractHistory, AbstractScalarHistory
+export AbstractHistory, AbstractScalarHistory, AbstractVectorFieldHistory, AbstractScalarFieldHistory
 
 abstract type AbstractHistory end
 # TODO: document required interfaces
 abstract type AbstractScalarHistory <: AbstractHistory end
 # TODO: document required interfaces
 abstract type AbstractVectorFieldHistory <: AbstractHistory end
+# TODO: document required interfaces
+abstract type AbstractScalarFieldHistory <: AbstractHistory end
 
 #
 end

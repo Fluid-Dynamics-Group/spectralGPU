@@ -5,7 +5,7 @@ using ..fft: ifftn_mpi!, fftn_mpi!
 using ..mesh: Wavenumbers, WavenumbersGPU
 using ..state: State, StateGPU
 using ..Configuration: Config, calculate_dt
-using ..solver: compute_rhs! 
+using ..solver: compute_rhs!, curl!
 import ..Io
 
 using CUDA
@@ -13,7 +13,7 @@ using CUDA
 function integrate(
     parallel::P, 
     K::Wavenumbers, 
-    config::Config{CFG}, 
+    config::Config{CFG},
     state::State,
     U::Array{Float64, 4}, 
     U_hat::Array{ComplexF64, 4},
@@ -51,8 +51,9 @@ function __integrate(
 
     dt = calculate_dt(config)
 
-    #println("dt is " * string(dt))
-    
+    # initialize the vorticity before we do any writes
+    curl!(parallel, K, state.fft_plan, U_hat; out = state.curl)
+
     Io.write_io(t, io_exports);
 
     while t < config.time - 1e-8
