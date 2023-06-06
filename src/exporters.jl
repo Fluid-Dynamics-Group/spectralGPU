@@ -70,11 +70,11 @@ function Base.setindex!(hist::ScalarFieldH5History, value::ARR, idx::Int) where 
         hist.inner[:, :, :, idx] = value
     end
 end
-function scalar_field_h5_history(stepper::STEP, h5_file, name::String, config::Configuration.Config{CONFIG})::ScalarFieldH5History where STEP <: AbstractIoStepControl where CONFIG <: AbstractConfig
+function scalar_field_h5_history(stepper::STEP, h5_file, name::String, config::Configuration.Config{CONFIG}; export_type=Float32)::ScalarFieldH5History where STEP <: AbstractIoStepControl where CONFIG <: AbstractConfig
     dt = Configuration.calculate_dt(config)
     len = Io.num_writes(stepper, dt, config.time)
     N = config.N
-    ScalarFieldH5History(len, HDF5.create_dataset(h5_file, name, Float64, (N, N, N, len)))
+    ScalarFieldH5History(len, HDF5.create_dataset(h5_file, name, export_type, (N, N, N, len)))
 end
 
 #
@@ -90,11 +90,11 @@ function Base.setindex!(hist::VectorFieldH5History, value::ARR, idx::Int) where 
         hist.inner[:, :, :, :, idx] = value
     end
 end
-function vector_field_h5_history(stepper::STEP, h5_file, name::String, config::Configuration.Config{CONFIG})::VectorFieldH5History where STEP <: AbstractIoStepControl where CONFIG <: AbstractConfig
+function vector_field_h5_history(stepper::STEP, h5_file, name::String, config::Configuration.Config{CONFIG}; export_type=Float32)::VectorFieldH5History where STEP <: AbstractIoStepControl where CONFIG <: AbstractConfig
     dt = Configuration.calculate_dt(config)
     len = Io.num_writes(stepper, dt, config.time)
     N = config.N
-    VectorFieldH5History(len, HDF5.create_dataset(h5_file, name, Float64, (N, N, N, 3, len)))
+    VectorFieldH5History(len, HDF5.create_dataset(h5_file, name, export_type, (N, N, N, 3, len)))
 end
 
 #################

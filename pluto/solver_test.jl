@@ -92,7 +92,7 @@ function run_solver(N)#::Array{Float64, 4}
 	local K = solver.mesh.wavenumbers_gpu(N)
 	ic = solver.markers.TaylorGreen()
 
-	runtime = 1.1
+	runtime = 15.1
 	# config = solver.config.taylor_green_validation()
 	mesh = solver.mesh.new_mesh(N)
 	
@@ -160,16 +160,16 @@ function run_solver(N)#::Array{Float64, 4}
 	cos_step = solver.Io.dt_write(0.1)
 	cos_export = solver.Exporters.CosθExport(
 		cos_step,
-		solver.Exporters.scalar_field_h5_history(cos_step, f, "cos_theta", config),
+		solver.Exporters.scalar_field_h5_history(cos_step, f, "cos_theta", config; export_type=Float64),
 		U,
 		state.curl
 	)
 	
 	exports::Vector{solver.markers.AbstractIoExport} = [
-		# energy_export,
-		# helicity_export,
-		# time_export,
-		# velocity_export,
+		energy_export,
+		helicity_export,
+		time_export,
+		velocity_export,
 		cos_export
 	]
 	
@@ -201,7 +201,7 @@ end
 d[1][9+1]
 
 # ╔═╡ 94ccf9c1-5822-4df5-b00f-30a25cc500ca
-@time U_cpu, ω_cpu = run_solver(64);
+@time U_cpu, ω_cpu = run_solver(64)
 
 # ╔═╡ 025845a1-6607-497f-b04b-33674a7600de
 dot3(a,b) = dropdims(sum(a .* b; dims=4);dims=4)
