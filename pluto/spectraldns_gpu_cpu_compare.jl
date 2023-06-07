@@ -57,6 +57,7 @@ gpu_tg_helicity = load_trajectories("/home/brooks/traj_compare/gpu_tg_epsilon2_1
 
 # ╔═╡ 1880c54f-2c6c-404d-8d47-4329d322a84a
 cpu_tg_energy = load_trajectories("/home/brooks/traj_compare/cpu_tg_epsilon1.h5", true)
+# cpu_tg_energy = cpu_tg
 
 # ╔═╡ 6c3f588e-fd7c-47ab-bb79-7960059f46bb
 gpu_tg_energy = load_trajectories("/home/brooks/traj_compare/gpu_tg_epsilon1.h5", false)

@@ -20,6 +20,11 @@ function create_config(N::Int, re::Float64, time::Float64, U::ARR)::Config{Produ
     return Config(ν, re, N, time, ProductionConfig(max_velocity))
 end
 
+function create_config(N::Int, re::Float64, time::Float64, max_velocity::Float64)::Config{ProductionConfig} where ARR <: AbstractArray{Float64, 4}
+    ν = 1 / re
+    return Config(ν, re, N, time, ProductionConfig(max_velocity))
+end
+
 function taylor_green_validation()::Config{ValidationConfig}
     N = 64
     re = 1600.
