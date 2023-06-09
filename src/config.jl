@@ -16,11 +16,12 @@ end
 
 function create_config(N::Int, re::Float64, time::Float64, U::ARR)::Config{ProductionConfig} where ARR <: AbstractArray{Float64, 4}
     ν = 1 / re
-    max_velocity = maximum(U)
+    max_velocity = maximum(abs.(U))
     return Config(ν, re, N, time, ProductionConfig(max_velocity))
 end
 
-function create_config(N::Int, re::Float64, time::Float64, max_velocity::Float64)::Config{ProductionConfig} where ARR <: AbstractArray{Float64, 4}
+# initialize a config with a hard-set maximum velocity
+function create_config(N::Int, re::Float64, time::Float64, max_velocity::Float64)::Config{ProductionConfig}
     ν = 1 / re
     return Config(ν, re, N, time, ProductionConfig(max_velocity))
 end
