@@ -115,10 +115,14 @@ function Io.export_data(exporter::EnergyExport{ARR}, time::Float64) where ARR <:
 	energy = sum(exporter.U .* exporter.U) / 2.
     energy *= (2 * pi/exporter.N)^3
 
+    if isnan(energy)
+        error("energy is NAN, simulation has exploded")
+    end
+
     step = Io.step_number(exporter.stepper)
     exporter.history[step] = energy
 end
-	
+
 function Io.get_stepper(exporter::EnergyExport{ARR, HIST}) where ARR <: AbstractArray{Float64, 4} where HIST <: AbstractScalarHistory
 	exporter.stepper
 end
@@ -145,10 +149,14 @@ function Io.export_data(exporter::HelicityExport{FARR, ARR, P, K, HIST}, time::F
 	helicity = sum(exporter.U .* exporter.omega) / 2.
     helicity *= (2 * pi/exporter.N)^3
 
+    if isnan(helicity)
+        error("helicity is NAN, simulation has exploded")
+    end
+
     step = Io.step_number(exporter.stepper)
     exporter.history[step] = helicity
 end
-	
+
 function Io.get_stepper(exporter::HelicityExport)
 	exporter.stepper
 end
@@ -166,7 +174,7 @@ function Io.export_data(exporter::TimeExport{HIST}, time::Float64
     step = Io.step_number(exporter.stepper)
     exporter.history[step] = time
 end
-	
+
 function Io.get_stepper(exporter::TimeExport)
 	exporter.stepper
 end
@@ -185,7 +193,7 @@ function Io.export_data(exporter::VectorFieldExport{HIST, ARR}, time::Float64
     step = Io.step_number(exporter.stepper)
     exporter.history[step] = exporter.vector_field
 end
-	
+
 function Io.get_stepper(exporter::VectorFieldExport{HIST, ARR}
 ) where HIST <: AbstractVectorFieldHistory where ARR <: AbstractArray{Float64, 4}
 	exporter.stepper
@@ -212,7 +220,7 @@ function Io.export_data(exporter::CosθExport{HIST, ARR}, time::Float64
     exporter.history[step] = dot_arr(exporter.velocity, exporter.vorticity) ./ 
     (sqrt.(dot_arr(exporter.velocity, exporter.velocity)) .* sqrt.(dot_arr(exporter.vorticity, exporter.vorticity)))
 end
-	
+
 function Io.get_stepper(exporter::CosθExport{HIST, ARR}
 ) where HIST <: AbstractScalarFieldHistory where ARR <: AbstractArray{Float64, 4}
 	exporter.stepper
