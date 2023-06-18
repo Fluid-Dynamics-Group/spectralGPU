@@ -171,8 +171,8 @@ struct CirculationExport{ARR <: AbstractArray{Float64, 4}, HIST <: AbstractScala
 	omega::ARR
 end
 
-function Io.export_data(exporter::CirculationExport{FARR, ARR, P, K, HIST}, time::Float64
-) where ARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4} where P <: AbstractParallel where K <: AbstractWavenumbers where HIST<: AbstractScalarHistory
+function Io.export_data(exporter::CirculationExport{ARR, HIST}, time::Float64
+) where ARR <: AbstractArray{Float64, 4} where HIST<: AbstractScalarHistory
 
     circulation = sum(exporter.omega) * (2 * pi / N)^3
 
