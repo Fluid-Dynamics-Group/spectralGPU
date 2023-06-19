@@ -174,7 +174,7 @@ end
 function Io.export_data(exporter::CirculationExport{ARR, HIST}, time::Float64
 ) where ARR <: AbstractArray{Float64, 4} where HIST<: AbstractScalarHistory
 
-    circulation = sum(exporter.omega) * (2 * pi / N)^3
+    circulation = sum(exporter.omega) * (2 * pi / exporter.N)^3
 
     if isnan(circulation)
         error("circulation is NAN, simulation has exploded")
