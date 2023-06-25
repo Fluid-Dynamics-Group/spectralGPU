@@ -126,6 +126,34 @@ end
             true
         end
     end
+
+    # ABC flow
+    @test begin
+        ic = InitialCondition.ABC()
+        InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+        u_hat_sum = sum(abs.(U_hat))
+
+        if u_hat_sum == 0
+            println("uhat sum was zero: ", u_hat_sum)
+            false
+        else
+            true
+        end
+    end
+
+    # karlik flow
+    @test begin
+        ic = InitialCondition.Karlik()
+        InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+        u_hat_sum = sum(abs.(U_hat))
+
+        if u_hat_sum == 0
+            println("uhat sum was zero: ", u_hat_sum)
+            false
+        else
+            true
+        end
+    end
 end
 
 @testset "solver.jl" begin

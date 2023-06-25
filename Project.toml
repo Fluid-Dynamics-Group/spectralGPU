@@ -1,7 +1,7 @@
 name = "spectralGPU"
 uuid = "1f941c8d-9269-406b-be03-2a5a5e88bc1c"
 authors = ["brooks"]
-version = "0.2.11"
+version = "0.3.0"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"

@@ -67,10 +67,10 @@ end
     U_inverse = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
-    ic = InitialCondition.TaylorGreen()
     msh = Mesh.new_mesh(N)
-
     plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+
+    ic = InitialCondition.TaylorGreen()
     InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
     u_hat_sum = sum(abs.(U_hat))
@@ -100,6 +100,34 @@ end
         diff = U - U_inverse
         l1_error = sum(abs.(diff))
         l1_error < 1e-5
+    end
+    
+    # ABC flow
+    @test begin
+        ic = InitialCondition.ABC()
+        InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+        u_hat_sum = sum(abs.(U_hat))
+
+        if u_hat_sum == 0
+            println("uhat sum was zero: ", u_hat_sum)
+            false
+        else
+            true
+        end
+    end
+
+    # karlik flow
+    @test begin
+        ic = InitialCondition.Karlik()
+        InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+        u_hat_sum = sum(abs.(U_hat))
+
+        if u_hat_sum == 0
+            println("uhat sum was zero: ", u_hat_sum)
+            false
+        else
+            true
+        end
     end
 end
 

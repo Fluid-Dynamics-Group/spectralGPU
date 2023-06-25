@@ -86,7 +86,7 @@ end
 # 
 function setup_initial_condition(
     parallel::P, 
-    ic::ABC, 
+    ic::Karlik, 
     mesh::ComputationalMesh, 
     U::XARR,
     U_hat::FARR,
