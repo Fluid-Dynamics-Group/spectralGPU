@@ -145,7 +145,7 @@ end
 function Io.export_data(exporter::HelicityExport{FARR, ARR, P, K, HIST}, time::Float64
 ) where ARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4} where P <: AbstractParallel where K <: AbstractWavenumbers where HIST<: AbstractScalarHistory
 
-    solver.curl!(exporter.parallel, exporter.K, exporter.plan, exporter.U_hat; out = exporter.omega)
+    Solver.curl!(exporter.parallel, exporter.K, exporter.plan, exporter.U_hat; out = exporter.omega)
 	helicity = sum(exporter.U .* exporter.omega) / 2.
     helicity *= (2 * pi/exporter.N)^3
 
