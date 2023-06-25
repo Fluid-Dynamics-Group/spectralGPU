@@ -1,4 +1,4 @@
-module fft
+module Fft
 
 export fftn_mpi!, ifftn_mpi!, Plan, plan_ffts
 
@@ -7,8 +7,8 @@ using CUDA.CUFFT
 using CUDA
 using LinearAlgebra: mul!
 
-using ..markers: AbstractParallel, ParallelMpi, SingleThreadCPU, SingleThreadGPU
-using ..mesh: Wavenumbers, WavenumbersGPU
+using ..Markers: AbstractParallel, ParallelMpi, SingleThreadCPU, SingleThreadGPU
+using ..Mesh: Wavenumbers, WavenumbersGPU
 
 #
 # FFT Planning

@@ -1,15 +1,15 @@
-module state
+module State
 
-using ..mesh: Wavenumbers
-using ..markers: AbstractState, AbstractWavenumbers, AbstractConfig
+using ..Mesh: Wavenumbers
+using ..Markers: AbstractState, AbstractWavenumbers, AbstractConfig
 using ..Configuration: Config
-using ..fft: Plan
+using ..Fft: Plan
 
 using CUDA
 
 export State, create_state, create_state_gpu
 
-struct State <: AbstractState
+struct StateCPU <: AbstractState
     dU::Array{ComplexF64, 4}
     U_hat₁::Array{ComplexF64, 4}
     U_hat₀::Array{ComplexF64, 4}
@@ -43,7 +43,7 @@ struct StateGPU <: AbstractState
     fft_plan::Plan
 end
 
-function create_state(N::Int, K::WAVE, config::Config{CFG}, plan::Plan)::State where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
+function create_state(N::Int, K::WAVE, config::Config{CFG}, plan::Plan)::StateCPU where WAVE <: AbstractWavenumbers where CFG <: AbstractConfig
     dU = ComplexF64.(zeros(K.kn, N, N, 3))
     U_hat₁ = ComplexF64.(zeros(K.kn, N, N, 3))
     U_hat₀ = ComplexF64.(zeros(K.kn, N, N, 3))
@@ -76,7 +76,7 @@ function create_state(N::Int, K::WAVE, config::Config{CFG}, plan::Plan)::State w
     a = [1/6, 1/3, 1/3, 1/6]
     b = [0.5, 0.5, 1.]
 
-    State(
+    StateCPU(
         dU,
         U_hat₁,
         U_hat₀,

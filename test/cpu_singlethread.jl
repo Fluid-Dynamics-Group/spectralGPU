@@ -1,11 +1,11 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, Configuration, solver, Integrate, Forcing, Io
+using .spectralGPU: Mesh, Fft, Markers, InitialCondition, State, Configuration, Solver, Integrate, Forcing, Io
 using Test
 using Printf
 
 @testset "mesh.jl" begin
     # ensure this compiles
-    k = mesh.wavenumbers(32)
+    k = Mesh.wavenumbers(32)
 
     @test k.kx[:, 1, 1] == k.kx[:, 2, 2]
     @test k.ky[1, :, 1] == k.ky[2, :, 2]
@@ -90,33 +90,33 @@ end
 
 @testset "fft.jl planning" begin
     N = 64
-    parallel = markers.SingleThreadCPU();
-    K = mesh.wavenumbers(N)
+    parallel = Markers.SingleThreadCPU();
+    K = Mesh.wavenumbers(N)
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
 
     @test begin
-        fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+        Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
         true
     end
 end
 
 @testset "initial_condition.jl" begin
-    parallel = markers.SingleThreadCPU()
+    parallel = Markers.SingleThreadCPU()
     N = 64
 
-    K = mesh.wavenumbers(N)
+    K = Mesh.wavenumbers(N)
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
 
-    msh = mesh.new_mesh(N)
+    msh = Mesh.new_mesh(N)
 
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     # taylor green
     @test begin
-        ic = markers.TaylorGreen()
-        initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+        ic = InitialCondition.TaylorGreen()
+        InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
         u_hat_sum = sum(abs.(U_hat))
 
         if u_hat_sum == 0
@@ -129,39 +129,38 @@ end
 end
 
 @testset "solver.jl" begin
-    parallel = markers.SingleThreadCPU()
+    parallel = Markers.SingleThreadCPU()
     N = 64
     re = 40.
 
-    K = mesh.wavenumbers(N)
+    K = Mesh.wavenumbers(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
 
     cfg = Configuration.taylor_green_validation()
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
-    st = state.create_state(N, K, cfg, plan)
-    msh = mesh.new_mesh(N)
+    st = State.create_state(N, K, cfg, plan)
+    msh = Mesh.new_mesh(N)
 
     forcing = Forcing.Unforced();
 
     # curl
     @test begin
-        #solver.curl!(K, U_hat; out = st.curl[:, :, :, :])
-        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
+        Solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
         true
     end
 
     # cross
     @test begin
-        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
+        Solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
         true
     end
 
     # main solver call
     @test begin
-        solver.compute_rhs!(
+        Solver.compute_rhs!(
             2,
             parallel,
             K,
@@ -177,10 +176,10 @@ end
     ######## Now, begin numerical validation of curl / cross / RHS
     ########
 
-    initial_condition.setup_initial_condition(parallel, initial_condition.TaylorGreen(), msh, U, U_hat, plan)
+    InitialCondition.setup_initial_condition(parallel, InitialCondition.TaylorGreen(), msh, U, U_hat, plan)
 
     @test begin
-        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
+        Solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
 
         result = Int(floor(sum(abs.(st.curl))))
         t1_result = Int(floor(sum(abs.(st.curl[:, :, :, 1]))))
@@ -210,11 +209,11 @@ end
 
     @test begin
         cross = zeros(N, N, N, 3)
-        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
+        Solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
 
         # inverse FFT the data to X space for comparissons
         @views for i in 1:3
-            fft.ifftn_mpi!(
+            Fft.ifftn_mpi!(
                 parallel, K, plan, 
                 st.dU[:, :, :, i], cross[:, :, :, i]
             )
@@ -246,7 +245,7 @@ end
     # main solver call
     @test begin
         dU_real = zeros(N, N, N, 3)
-        solver.compute_rhs!(
+        Solver.compute_rhs!(
             1,
             parallel,
             K,
@@ -258,7 +257,7 @@ end
 
         # inverse FFT the data to X space for comparissons
         @views for i in 1:3
-            fft.ifftn_mpi!(
+            Fft.ifftn_mpi!(
                 parallel, K, plan, 
                 st.dU[:, :, :, i], dU_real[:, :, :, i]
             )
@@ -293,21 +292,21 @@ end
 end
 
 @testset "integrate.jl" begin
-    parallel = markers.SingleThreadCPU()
+    parallel = Markers.SingleThreadCPU()
     N = 64
     re = 40.
     time = 0.05
 
-    K = mesh.wavenumbers(N)
+    K = Mesh.wavenumbers(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     cfg = Configuration.create_config(N, re, time, U)
-    msh = mesh.new_mesh(N)
+    msh = Mesh.new_mesh(N)
 
-    st = state.create_state(N, K, cfg, plan)
+    st = State.create_state(N, K, cfg, plan)
 
     forcing = Forcing.Unforced();
 
@@ -321,30 +320,30 @@ end
             U,
             U_hat,
             forcing,
-            Vector{markers.AbstractIoExport}()
+            Vector{Markers.AbstractIoExport}()
         )
         true
     end
 end
 
 @testset "integrate.jl - checked" begin
-    parallel = markers.SingleThreadCPU()
+    parallel = Markers.SingleThreadCPU()
     N = 64
 
     forcing = Forcing.Unforced();
 
-    K = mesh.wavenumbers(N)
+    K = Mesh.wavenumbers(N)
     cfg = Configuration.taylor_green_validation()
-    msh = mesh.new_mesh(N)
-    ic = markers.TaylorGreen()
+    msh = Mesh.new_mesh(N)
+    ic = InitialCondition.TaylorGreen()
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+    InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    st = state.create_state(N, K, cfg, plan)
+    st = State.create_state(N, K, cfg, plan)
 
     u_sum = sum(abs.(U))
     println("sum of all values in U is ", u_sum);
@@ -361,7 +360,7 @@ end
             U,
             U_hat,
             forcing,
-            Vector{markers.AbstractIoExport}(),
+            Vector{Markers.AbstractIoExport}(),
         )
 
         u_sum = sum(abs.(U))

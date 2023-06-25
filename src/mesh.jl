@@ -1,9 +1,9 @@
-module mesh
+module Mesh
 
-using ..markers: AbstractWavenumbers
+using ..Markers: AbstractWavenumbers
 
 export Wavenumbers, wavenumbers, WavenumbersGPU, wavenumbers_gpu
-export Mesh, new_mesh 
+export ComputationalMesh, new_mesh 
 
 using CUDA
 using LazyGrids
@@ -89,7 +89,7 @@ function Base.getindex(k_all::WavenumbersGPU, dim::Int)::CuArray{Int64, 3}
     end
 end
 
-struct Mesh
+struct ComputationalMesh
     n::Int
     x::LazyGrids.GridSL{Float64, 1, 3, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}}
     y::LazyGrids.GridSL{Float64, 2, 3, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}}
@@ -107,14 +107,14 @@ function nprange(start, _end, n)
 end
 
 # create a mesh that is identical to numpy's mgrid[] spacing
-function new_mesh(n::Int)
+function new_mesh(n::Int)::ComputationalMesh
     xvals = nprange(0, 2pi, n)
     yvals = copy(xvals)
     zvals = copy(xvals)
 
     mesh_x, mesh_y, mesh_z = ndgrid(xvals, yvals, zvals); size(mesh_x)
 
-    return Mesh(n, mesh_x, mesh_y, mesh_z)
+    return ComputationalMesh(n, mesh_x, mesh_y, mesh_z)
 end
 
 #

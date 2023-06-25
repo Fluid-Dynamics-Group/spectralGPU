@@ -1,6 +1,6 @@
 module Configuration
 
-using ..markers: AbstractConfig, ProductionConfig, ValidationConfig
+using ..Markers: AbstractConfig, ProductionConfig, ValidationConfig
 
 export Config, create_config, taylor_green_validation, calculate_dt
 

@@ -1,77 +1,77 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, Configuration, solver, Integrate, Forcing
+using .spectralGPU: Mesh, Fft, Markers, InitialCondition, State, Configuration, Solver, Integrate, Forcing
 using Test
 using CUDA
 
 @testset "fft.jl planning" begin
     N = 64
-    parallel = markers.SingleThreadGPU();
-    K = mesh.wavenumbers_gpu(N)
+    parallel = Markers.SingleThreadGPU();
+    K = Mesh.wavenumbers_gpu(N)
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
     @test begin
-        fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+        Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
         true
     end
 end
 
 @testset "state.jl" begin
-    parallel = markers.SingleThreadGPU()
+    parallel = Markers.SingleThreadGPU()
 
     N = 64
-    K = mesh.wavenumbers_gpu(N)
+    K = Mesh.wavenumbers_gpu(N)
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     cfg = Configuration.create_config(N, 40., 0.00001, U)
 
 
     @test begin
-        st::state.StateGPU = state.create_state_gpu(N, K, cfg, plan)
+        st::State.StateGPU = State.create_state_gpu(N, K, cfg, plan)
         true
     end
 end
 
 @testset "cuda fft" begin
-    parallel = markers.SingleThreadGPU()
+    parallel = Markers.SingleThreadGPU()
     N = 64
 
-    K = mesh.wavenumbers_gpu(N)
+    K = Mesh.wavenumbers_gpu(N)
 
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
     @test begin
-        @views fft.fftn_mpi!(parallel, plan, U[:, :, :, 1], U_hat[:, :, :, 1])
+        @views Fft.fftn_mpi!(parallel, plan, U[:, :, :, 1], U_hat[:, :, :, 1])
         true
     end
 
     @test begin
-        @views fft.ifftn_mpi!(parallel, K, plan, U_hat[:, :, :, 1], U[:, :, :, 1])
+        @views Fft.ifftn_mpi!(parallel, K, plan, U_hat[:, :, :, 1], U[:, :, :, 1])
         true
     end
 end
 
 
 @testset "cuda fft initial condition" begin
-    parallel = markers.SingleThreadGPU()
+    parallel = Markers.SingleThreadGPU()
     N = 64
 
-    K = mesh.wavenumbers_gpu(N)
+    K = Mesh.wavenumbers_gpu(N)
 
     U = CuArray(zeros(N, N, N, 3))
     U_inverse = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
-    ic = markers.TaylorGreen()
-    msh = mesh.new_mesh(N)
+    ic = InitialCondition.TaylorGreen()
+    msh = Mesh.new_mesh(N)
 
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
     u_hat_sum = sum(abs.(U_hat))
 
@@ -94,7 +94,7 @@ end
     # ensure the inverse FFT works equally well for CUDA arrays
     @test begin
         @views for i in 1:3
-            fft.ifftn_mpi!(parallel, K, plan, U_hat[:, :, :, i], U_inverse[:, :, :, i])
+            Fft.ifftn_mpi!(parallel, K, plan, U_hat[:, :, :, i], U_inverse[:, :, :, i])
         end
 
         diff = U - U_inverse
@@ -104,38 +104,38 @@ end
 end
 
 @testset "solver.jl" begin
-    parallel = markers.SingleThreadGPU()
+    parallel = Markers.SingleThreadGPU()
     N = 64
     re = 40.
 
-    K = mesh.wavenumbers_gpu(N)
+    K = Mesh.wavenumbers_gpu(N)
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
     cfg = Configuration.taylor_green_validation()
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
-    st = state.create_state_gpu(N, K, cfg, plan)
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    st = State.create_state_gpu(N, K, cfg, plan)
 
-    msh = mesh.new_mesh(N)
+    msh = Mesh.new_mesh(N)
     cfg = Configuration.create_config(N, re, 1.0, U)
 
     forcing = Forcing.Unforced();
 
     # curl
     @test begin
-        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
+        Solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
         true
     end
 
     # cross
     @test begin
-        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
+        Solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
         true
     end
 
     # main solver call
     @test begin
-        solver.compute_rhs!(
+        Solver.compute_rhs!(
             2,
             parallel,
             K,
@@ -151,10 +151,10 @@ end
     ######## Now, begin numerical validation of curl / cross / RHS
     ########
 
-    initial_condition.setup_initial_condition(parallel, initial_condition.TaylorGreen(), msh, U, U_hat, plan)
+    InitialCondition.setup_initial_condition(parallel, InitialCondition.TaylorGreen(), msh, U, U_hat, plan)
 
     @test begin
-        solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
+        Solver.curl!(parallel, K, st.fft_plan, U_hat; out=st.curl)
 
         result = Int(floor(sum(abs.(st.curl))))
         t1_result = Int(floor(sum(abs.(st.curl[:, :, :, 1]))))
@@ -184,11 +184,11 @@ end
 
     @test begin
         cross = CuArray(zeros(N, N, N, 3))
-        solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
+        Solver.cross!(parallel, st.fft_plan, U, st.curl; out = st.dU)
 
         # inverse FFT the data to X space for comparissons
         @views for i in 1:3
-            fft.ifftn_mpi!(
+            Fft.ifftn_mpi!(
                 parallel, K, plan, 
                 st.dU[:, :, :, i], cross[:, :, :, i]
             )
@@ -220,7 +220,7 @@ end
     # main solver call
     @test begin
         dU_real = CuArray(zeros(N, N, N, 3))
-        solver.compute_rhs!(
+        Solver.compute_rhs!(
             1,
             parallel,
             K,
@@ -232,7 +232,7 @@ end
 
         # inverse FFT the data to X space for comparissons
         @views for i in 1:3
-            fft.ifftn_mpi!(
+            Fft.ifftn_mpi!(
                 parallel, K, plan, 
                 st.dU[:, :, :, i], dU_real[:, :, :, i]
             )
@@ -266,22 +266,22 @@ end
 end
 
 @testset "integrate.jl - checked" begin
-    parallel = markers.SingleThreadGPU()
+    parallel = Markers.SingleThreadGPU()
     N = 64
 
-    K = mesh.wavenumbers_gpu(N)
+    K = Mesh.wavenumbers_gpu(N)
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
 
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
-    msh = mesh.new_mesh(N)
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    msh = Mesh.new_mesh(N)
     cfg = Configuration.taylor_green_validation()
-    st = state.create_state_gpu(N, K, cfg, plan)
-    ic = markers.TaylorGreen()
+    st = State.create_state_gpu(N, K, cfg, plan)
+    ic = InitialCondition.TaylorGreen()
 
     forcing = Forcing.Unforced();
 
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+    InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
     u_sum = sum(abs.(U))
     println("sum of all values in U is ", u_sum);
@@ -298,7 +298,7 @@ end
             U,
             U_hat,
             forcing,
-            Vector{markers.AbstractIoExport}(),
+            Vector{Markers.AbstractIoExport}(),
         )
 
         u_sum = sum(abs.(U))

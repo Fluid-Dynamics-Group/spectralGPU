@@ -3,9 +3,9 @@ module Exporters
 export EnergyExport, HelicityExport, ScalarMemoryHistory, ScalarH5History, scalar_h5_history, scalar_memory_history
 export VectorFieldExport, vector_field_h5_history
 
-using ..markers: AbstractIoExport, AbstractParallel, AbstractWavenumbers, AbstractScalarHistory, AbstractIoStepControl, AbstractState, AbstractConfig, AbstractVectorFieldHistory, AbstractScalarFieldHistory
-using ..fft: Plan
-import ..solver
+using ..Markers: AbstractIoExport, AbstractParallel, AbstractWavenumbers, AbstractScalarHistory, AbstractIoStepControl, AbstractState, AbstractConfig, AbstractVectorFieldHistory, AbstractScalarFieldHistory
+using ..Fft: Plan
+import ..Solver
 import ..Io
 import ..Configuration
 

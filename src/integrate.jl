@@ -1,11 +1,11 @@
 module Integrate
 
-using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig, AbstractForcing, AbstractIoExport
-using ..fft: ifftn_mpi!, fftn_mpi!
-using ..mesh: Wavenumbers, WavenumbersGPU
-using ..state: State, StateGPU
+using ..Markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig, AbstractForcing, AbstractIoExport
+using ..Fft: ifftn_mpi!, fftn_mpi!
+using ..Mesh: Wavenumbers, WavenumbersGPU
+using ..State: StateCPU, StateGPU
 using ..Configuration: Config, calculate_dt
-using ..solver: compute_rhs!, curl!
+using ..Solver: compute_rhs!, curl!
 import ..Io
 
 using CUDA
@@ -14,7 +14,7 @@ function integrate(
     parallel::P, 
     K::Wavenumbers, 
     config::Config{CFG},
-    state::State,
+    state::StateCPU,
     U::Array{Float64, 4}, 
     U_hat::Array{ComplexF64, 4},
     forcing::FORCING,

@@ -1,5 +1,5 @@
 include("../src/spectralGPU.jl");
-using .spectralGPU: mesh, fft, markers, initial_condition, state, Configuration, solver, Integrate
+using .spectralGPU: Mesh, Fft, Markers, InitialCondition, State, Configuration, Solver, Integrate
 
 using CUDA
 using BenchmarkTools
@@ -11,19 +11,19 @@ using BenchmarkTools
 N = 128
 
 begin
-    parallel = markers.SingleThreadGPU()
+    parallel = Markers.SingleThreadGPU()
 
-    K = mesh.wavenumbers_gpu(N)
+    K = Mesh.wavenumbers_gpu(N)
 
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
-    msh = mesh.new_mesh(N)
-    ic = markers.TaylorGreen()
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+    msh = Mesh.new_mesh(N)
+    ic = InitialCondition.TaylorGreen()
+    InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    r = @benchmark @views fft.fftn_mpi!($parallel, $plan, $U[:, :, :, 1], $U_hat[:, :, :, 1])
+    r = @benchmark @views Fft.fftn_mpi!($parallel, $plan, $U[:, :, :, 1], $U_hat[:, :, :, 1])
 
     println("gpu forward FFT")
     display(r)
@@ -35,19 +35,19 @@ end
 #########
 
 begin
-    parallel = markers.SingleThreadCPU()
+    parallel = Markers.SingleThreadCPU()
 
-    K = mesh.wavenumbers(N)
+    K = Mesh.wavenumbers(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
-    msh = mesh.new_mesh(N)
-    ic = markers.TaylorGreen()
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+    msh = Mesh.new_mesh(N)
+    ic = InitialCondition.TaylorGreen()
+    InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    r = @benchmark @views fft.fftn_mpi!($parallel, $plan, $U[:, :, :, 1], $U_hat[:, :, :, 1])
+    r = @benchmark @views Fft.fftn_mpi!($parallel, $plan, $U[:, :, :, 1], $U_hat[:, :, :, 1])
 
     println("cpu forward FFT")
     display(r)
@@ -59,19 +59,19 @@ end
 #########
 
 begin
-    parallel = markers.SingleThreadGPU()
+    parallel = Markers.SingleThreadGPU()
 
-    K = mesh.wavenumbers_gpu(N)
+    K = Mesh.wavenumbers_gpu(N)
 
     U = CuArray(zeros(N, N, N, 3))
     U_hat = CuArray(ComplexF64.(zeros(K.kn, N, N, 3)))
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
-    msh = mesh.new_mesh(N)
-    ic = markers.TaylorGreen()
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+    msh = Mesh.new_mesh(N)
+    ic = InitialCondition.TaylorGreen()
+    InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    r = @benchmark @views fft.ifftn_mpi!($parallel, $K, $plan, $U_hat[:, :, :, 1], $U[:, :, :, 1])
+    r = @benchmark @views Fft.ifftn_mpi!($parallel, $K, $plan, $U_hat[:, :, :, 1], $U[:, :, :, 1])
 
     println("gpu inverse FFT")
     display(r)
@@ -83,19 +83,19 @@ end
 #########
 
 begin
-    parallel = markers.SingleThreadCPU()
+    parallel = Markers.SingleThreadCPU()
 
-    K = mesh.wavenumbers(N)
+    K = Mesh.wavenumbers(N)
 
     U = zeros(N, N, N, 3)
     U_hat = ComplexF64.(zeros(K.kn, N, N, 3))
-    plan = fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
+    plan = Fft.plan_ffts(parallel, K, U[:, :, :, 1], U_hat[:, :, :, 1])
 
-    msh = mesh.new_mesh(N)
-    ic = markers.TaylorGreen()
-    initial_condition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
+    msh = Mesh.new_mesh(N)
+    ic = InitialCondition.TaylorGreen()
+    InitialCondition.setup_initial_condition(parallel, ic, msh, U, U_hat, plan)
 
-    r = @benchmark @views fft.ifftn_mpi!($parallel, $K, $plan, $U_hat[:, :, :, 1], $U[:, :, :, 1])
+    r = @benchmark @views Fft.ifftn_mpi!($parallel, $K, $plan, $U_hat[:, :, :, 1], $U[:, :, :, 1])
 
     println("cpu inverse FFT")
     display(r)

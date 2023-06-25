@@ -2,7 +2,7 @@ module Io
 
 export never_write, dt_write, step_number, should_write, increase_step, write_io
 
-using ..markers: AbstractIoStepControl, AbstractIoExport
+using ..Markers: AbstractIoStepControl, AbstractIoExport
 using Printf
 
 struct NeverWrite <: AbstractIoStepControl

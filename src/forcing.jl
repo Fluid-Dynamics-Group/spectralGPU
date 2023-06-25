@@ -2,7 +2,7 @@ module Forcing
 
 export Unforced, force_system!
 
-using ..markers: AbstractState, AbstractForcing, AbstractParallel
+using ..Markers: AbstractState, AbstractForcing, AbstractParallel
 using Printf
 
 # structure representing an unforced system

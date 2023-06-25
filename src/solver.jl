@@ -1,11 +1,11 @@
-module solver
+module Solver
 
 export curl!, cross!, compute_rhs!
 
-using ..markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig, AbstractForcing
-using ..fft: ifftn_mpi!, fftn_mpi!, Plan
-using ..mesh: Wavenumbers, WavenumbersGPU
-using ..state: State, StateGPU
+using ..Markers: AbstractParallel, AbstractState, AbstractWavenumbers, AbstractConfig, AbstractForcing
+using ..Fft: ifftn_mpi!, fftn_mpi!, Plan
+using ..Mesh: Wavenumbers, WavenumbersGPU
+using ..State: StateCPU, StateGPU
 using ..Configuration: Config
 using ..Forcing: force_system!
 
@@ -122,7 +122,7 @@ function compute_rhs!(
     K::Wavenumbers,
     U::Array{Float64, 4},
     U_hat::Array{ComplexF64, 4},
-    state::State,
+    state::StateCPU,
     forcing::FORCING
 ) where P <: AbstractParallel where FORCING <: AbstractForcing
     __compute_rhs!(rk_step, parallel, K, U, U_hat, state, forcing)

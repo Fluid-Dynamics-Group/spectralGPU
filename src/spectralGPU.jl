@@ -14,12 +14,14 @@ include("./solver.jl")
 include("./exporters.jl")
 include("./integrate.jl")
 
-export fft
-export mesh
-export markers
-export state
-export config
-export initial_condition
+export Fft
+export Mesh
+export Markers
+export State
+export Config
+export InitialCondition
+export Exporters
+export Io
 
 #
 end

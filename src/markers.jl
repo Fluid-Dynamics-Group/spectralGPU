@@ -1,4 +1,4 @@
-module markers
+module Markers
 
 #
 # Parallization (MPI, Single thread)
@@ -13,12 +13,9 @@ struct SingleThreadGPU <: AbstractParallel end
 #
 # Initial conditions
 #
-export AbstractInitialCondition, TaylorGreen, LoadInitialCondition
+export AbstractInitialCondition
 
 abstract type AbstractInitialCondition end
-struct TaylorGreen <: AbstractInitialCondition end
-struct ABC <: AbstractInitialCondition end
-struct LoadInitialCondition <: AbstractInitialCondition end
 
 # State
 export AbstractState

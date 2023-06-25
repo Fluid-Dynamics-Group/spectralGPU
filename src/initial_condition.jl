@@ -1,16 +1,24 @@
-module initial_condition
+module InitialCondition
 
-using ..mesh: Mesh
-using ..fft: fftn_mpi!, Plan
-using ..markers: AbstractInitialCondition, AbstractParallel, TaylorGreen, ABC, LoadInitialCondition
+using ..Mesh: ComputationalMesh
+using ..Fft: fftn_mpi!, Plan
+using ..Markers: AbstractInitialCondition, AbstractParallel
 
 using CUDA
+
+export setup_initial_condition
+export TaylorGreen, ABC, LoadInitialCondition, Karlik
+
+struct TaylorGreen <: AbstractInitialCondition end
+struct ABC <: AbstractInitialCondition end
+struct LoadInitialCondition <: AbstractInitialCondition end
+struct Karlik <: AbstractInitialCondition end
 
 # catch-all for initial condition setup
 function setup_initial_condition(
     parallel::P, 
     ic::I, 
-    mesh::Mesh, 
+    mesh::ComputationalMesh, 
     U::XARR,
     U_hat::FARR,
 ) where P <: AbstractParallel where I <: AbstractInitialCondition where XARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4}
@@ -21,7 +29,7 @@ end
 function setup_initial_condition(
     parallel::P, 
     ic::TaylorGreen, 
-    mesh::Mesh, 
+    mesh::ComputationalMesh, 
     U::XARR,
     U_hat::FARR,
     plan::Plan
@@ -41,7 +49,7 @@ end
 function setup_initial_condition(
     parallel::P, 
     ic::ABC, 
-    mesh::Mesh, 
+    mesh::ComputationalMesh, 
     U::XARR,
     U_hat::FARR,
     plan::Plan
@@ -63,12 +71,35 @@ end
 function setup_initial_condition(
     parallel::P, 
     ic::LoadInitialCondition, 
-    mesh::Mesh, 
+    mesh::ComputationalMesh, 
     U::XARR,
     U_hat::FARR,
     plan::Plan
 ) where P <: AbstractParallel where XARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4}
     # U should be loaded before now, all we have to do is the forward transform
+    @views for i in 1:3
+        fftn_mpi!(parallel, plan, U[:, :, :, i], U_hat[:, :, :, i])
+    end
+end
+
+# 'Karlik' Flow
+# 
+function setup_initial_condition(
+    parallel::P, 
+    ic::ABC, 
+    mesh::ComputationalMesh, 
+    U::XARR,
+    U_hat::FARR,
+    plan::Plan
+) where P <: AbstractParallel where XARR <: AbstractArray{Float64, 4} where FARR <: AbstractArray{ComplexF64, 4}
+    A = 1
+    B = 2
+    C = 3
+
+    U[:, :, :, 1] .= A .* (cos.(mesh.y) .+ sin.(mesh.z))
+    U[:, :, :, 2] .= B .* (cos.(mesh.z) .+ sin.(mesh.x))
+    U[:, :, :, 3] .= C .* (cos.(mesh.x) .+ sin.(mesh.y))
+
     @views for i in 1:3
         fftn_mpi!(parallel, plan, U[:, :, :, i], U_hat[:, :, :, i])
     end
